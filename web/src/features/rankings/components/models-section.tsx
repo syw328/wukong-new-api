@@ -90,6 +90,12 @@ export function ModelsSection(props: ModelsSectionProps) {
     [props.rows, props.metric]
   )
 
+  let totalLabel =
+    props.metric === 'calls'
+      ? totalTokens.toLocaleString()
+      : formatTokens(totalTokens)
+  if (props.metric !== 'calls' && props.rows.length === 0) totalLabel = '—'
+
   const spec = useMemo(() => {
     if (orderedPoints.length === 0) return null
     return {
@@ -193,9 +199,7 @@ export function ModelsSection(props: ModelsSectionProps) {
         </div>
         <div className='shrink-0 text-right'>
           <div className='text-foreground font-mono text-2xl font-semibold tabular-nums'>
-            {props.metric === 'calls'
-              ? totalTokens.toLocaleString()
-              : formatTokens(totalTokens)}
+            {totalLabel}
           </div>
           <div className='text-muted-foreground/80 text-[10px] font-medium tracking-widest uppercase'>
             {t(props.metric === 'calls' ? 'calls' : 'tokens')}
@@ -228,7 +232,7 @@ export function ModelsSection(props: ModelsSectionProps) {
         <header className='px-5 pt-4 pb-2'>
           <h3 className='text-foreground inline-flex items-center gap-2 text-sm font-semibold'>
             <Trophy className='size-3.5 text-amber-500' />
-            {t('LLM Leaderboard')}
+            {t('Model Leaderboard')}
           </h3>
           <p className='text-muted-foreground/80 mt-0.5 text-xs'>
             {t('Compare the most popular models on the platform')}

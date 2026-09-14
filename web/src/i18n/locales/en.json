@@ -6521,6 +6521,8 @@
     "Request success rate; {{incidents}} hourly buckets contain failures": "Request success rate; {{incidents}} hourly buckets contain failures",
     "{{count}} failure buckets": "{{count}} failure buckets",
     "{{count}} upstream routes": "{{count}} upstream routes",
-    "{{count}} price groups": "{{count}} price groups"
+    "{{count}} price groups": "{{count}} price groups",
+    "Model Leaderboard": "Model Leaderboard",
+    "Token rankings include recorded usage from successful requests only. Missing historical Token counts are not estimated.": "Token rankings include recorded usage from successful requests only. Missing historical Token counts are not estimated."
   }
 }

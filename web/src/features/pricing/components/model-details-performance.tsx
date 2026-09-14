@@ -317,6 +317,7 @@ export function ModelDetailsPerformance(props: { model: PricingModel }) {
               cellClassName: tableStyles.compactCell,
               cell: (perf) => (
                 <UptimeSparkline
+                  successRate={perf.success_rate}
                   size='sm'
                   series={uptimeByGroup[perf.group] ?? []}
                 />

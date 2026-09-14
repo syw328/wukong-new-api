@@ -6521,6 +6521,8 @@
     "Request success rate; {{incidents}} hourly buckets contain failures": "请求成功率；{{incidents}} 个小时段出现失败",
     "{{count}} failure buckets": "{{count}} 个失败小时段",
     "{{count}} upstream routes": "{{count}} 条上游线路",
-    "{{count}} price groups": "{{count}} 个计价分组"
+    "{{count}} price groups": "{{count}} 个计价分组",
+    "Model Leaderboard": "模型排行榜",
+    "Token rankings include recorded usage from successful requests only. Missing historical Token counts are not estimated.": "Token 排行只累计成功请求中实际记录的用量；未保存的历史 Token 数不推算。"
   }
 }

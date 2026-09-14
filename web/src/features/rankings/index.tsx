@@ -184,12 +184,24 @@ export function Rankings() {
               )}
             </p>
           )}
+          {metric === 'tokens' && (
+            <p className='text-muted-foreground text-xs'>
+              {t(
+                'Token rankings include recorded usage from successful requests only. Missing historical Token counts are not estimated.'
+              )}
+            </p>
+          )}
           {snapshot?.range && (
             <p className='text-muted-foreground text-xs'>
               {t('Statistics range')}:{' '}
-              {new Date(snapshot.range.start).toLocaleString()} –{' '}
-              {new Date(snapshot.range.end).toLocaleString()} ·{' '}
-              {snapshot.range.timezone}
+              {new Date(snapshot.range.start).toLocaleString(undefined, {
+                timeZone: snapshot.range.timezone,
+              })}{' '}
+              –{' '}
+              {new Date(snapshot.range.end).toLocaleString(undefined, {
+                timeZone: snapshot.range.timezone,
+              })}{' '}
+              · {snapshot.range.timezone}
             </p>
           )}
 
