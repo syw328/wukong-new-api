@@ -26,6 +26,8 @@ import { useAuthStore } from '@/stores/auth-store'
 
 const searchSchema = z.object({
   redirect: z.string().optional(),
+  // 平台「API」入口带 ?provider=<slug> 时自动发起该自定义 OAuth 登录（无需再点按钮）。
+  provider: z.string().optional(),
 })
 
 export const Route = createFileRoute('/(auth)/sign-in')({

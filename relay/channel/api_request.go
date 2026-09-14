@@ -290,6 +290,7 @@ func processHeaderOverride(info *common.RelayInfo, c *gin.Context) (map[string]s
 
 		headerOverride[key] = value
 	}
+	injectPlatformRelayHeaders(headerOverride, info)
 	return headerOverride, nil
 }
 

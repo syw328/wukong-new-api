@@ -275,14 +275,19 @@ func (p *GenericOAuthProvider) GetUserInfo(ctx context.Context, token *OAuthToke
 		}
 	}
 
+	extra := map[string]any{
+		"provider": p.config.Slug,
+	}
+	// 平台身份源会在 userinfo 里附带账户余额（算力），用于把本地 quota 同步成展示镜像。
+	if balance := gjson.Get(bodyStr, "balance"); balance.Exists() && balance.Type == gjson.Number {
+		extra["balance"] = balance.Float()
+	}
 	return &OAuthUser{
 		ProviderUserID: userId,
 		Username:       username,
 		DisplayName:    displayName,
 		Email:          email,
-		Extra: map[string]any{
-			"provider": p.config.Slug,
-		},
+		Extra:          extra,
 	}, nil
 }
 

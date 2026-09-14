@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -39,6 +39,8 @@ type OAuthProvidersProps = {
   onWeChatLogin?: () => void
   isWeChatLoading?: boolean
   redirectTo?: string
+  /** 自动发起指定 slug 的自定义 OAuth 登录（平台无感跳转入口）。 */
+  autoProvider?: string
 }
 
 type ProviderButton = {
@@ -56,6 +58,7 @@ export function OAuthProviders({
   onWeChatLogin,
   isWeChatLoading = false,
   redirectTo,
+  autoProvider,
 }: OAuthProvidersProps) {
   const { t } = useTranslation()
   const {
@@ -69,6 +72,19 @@ export function OAuthProviders({
     handleTelegramLogin,
     handleCustomOAuthLogin,
   } = useOAuthLogin(status, redirectTo)
+
+  const autoStartedRef = useRef(false)
+  useEffect(() => {
+    if (!autoProvider || autoStartedRef.current || disabled) return
+    const provider = status?.custom_oauth_providers?.find(
+      (item) => item.slug === autoProvider
+    )
+    if (!provider) return
+    autoStartedRef.current = true
+    void handleCustomOAuthLogin(provider)
+    // handleCustomOAuthLogin 每次渲染都是新引用，只依赖状态与目标 slug。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoProvider, disabled, status?.custom_oauth_providers])
 
   const providerButtons: ProviderButton[] = []
 

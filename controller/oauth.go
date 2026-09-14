@@ -346,6 +346,9 @@ func handleOAuthLogin(c *gin.Context, provider oauth.Provider, oauthUser *oauth.
 		return
 	}
 
+	// 8.5 平台钱包权威：把平台余额镜像到本地 quota（仅展示与预检，真实扣费在平台）。
+	applyPlatformBalanceMirror(c, user, oauthUser)
+
 	// 9. Setup login
 	setupLogin(user, c)
 }
