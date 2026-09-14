@@ -18,15 +18,16 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useTranslation } from 'react-i18next'
 
-import { cn } from '@/lib/utils'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 import type { RankingPeriod } from '../types'
 
 const PERIODS: { id: RankingPeriod; labelKey: string }[] = [
+  { id: 'yesterday', labelKey: 'Yesterday' },
   { id: 'today', labelKey: 'Today' },
-  { id: 'week', labelKey: 'Week' },
-  { id: 'month', labelKey: 'Month' },
-  { id: 'year', labelKey: 'Year' },
+  { id: 'week', labelKey: 'Last 7 days' },
+  { id: 'month', labelKey: 'Last 30 days' },
+  { id: 'year', labelKey: 'Last 365 days' },
 ]
 
 type RankingsHeroProps = {
@@ -54,40 +55,22 @@ export function RankingsHero(props: RankingsHeroProps) {
         </p>
       </div>
 
-      {/* Underline tabs for period — clean and unobtrusive. */}
-      <div
-        role='tablist'
-        aria-label={t('Period')}
-        className='border-border/60 flex items-center border-b'
+      <Tabs
+        value={props.period}
+        onValueChange={(value) => props.onPeriodChange(value as RankingPeriod)}
       >
-        {PERIODS.map((p) => {
-          const isActive = props.period === p.id
-          return (
-            <button
-              key={p.id}
-              role='tab'
-              type='button'
-              aria-selected={isActive}
-              onClick={() => props.onPeriodChange(p.id)}
-              className={cn(
-                'focus-visible:ring-ring/40 relative -mb-px rounded-sm px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none',
-                isActive
-                  ? 'text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
+        <TabsList
+          variant='line'
+          aria-label={t('Period')}
+          className='h-auto flex-wrap'
+        >
+          {PERIODS.map((p) => (
+            <TabsTrigger key={p.id} value={p.id}>
               {t(p.labelKey)}
-              <span
-                aria-hidden
-                className={cn(
-                  'bg-foreground absolute inset-x-3 -bottom-px h-[2px] rounded-full transition-opacity',
-                  isActive ? 'opacity-100' : 'opacity-0'
-                )}
-              />
-            </button>
-          )
-        })}
-      </div>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
     </section>
   )
 }

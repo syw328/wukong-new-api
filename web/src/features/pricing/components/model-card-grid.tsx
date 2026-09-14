@@ -21,6 +21,8 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { ErrorState } from '@/components/error-state'
+import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
 import { getPerfMetricsSummary } from '@/features/performance-metrics/api'
 import { requireServerSuccess } from '@/lib/server-error-message'
@@ -52,6 +54,7 @@ export function ModelCardGrid(props: ModelCardGridProps) {
     queryKey: ['perf-metrics-summary', 24],
     queryFn: async () => requireServerSuccess(await getPerfMetricsSummary(24)),
     staleTime: 60 * 1000,
+    refetchInterval: 60_000,
     retry: false,
   })
 
@@ -74,6 +77,16 @@ export function ModelCardGrid(props: ModelCardGridProps) {
 
   return (
     <div className='flex flex-col gap-4 sm:gap-5'>
+      {perfQuery.isLoading && (
+        <LoadingState inline message={t('Loading model statistics...')} />
+      )}
+      {perfQuery.isError && (
+        <ErrorState
+          className='min-h-0 py-3'
+          title={t('Unable to load model statistics')}
+          onRetry={() => void perfQuery.refetch()}
+        />
+      )}
       <div className='grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3'>
         {pagedModels.map((model) => (
           <ModelCard

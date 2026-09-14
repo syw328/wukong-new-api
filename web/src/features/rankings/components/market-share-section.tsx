@@ -29,6 +29,7 @@ import type { RankingPeriod, VendorRanking, VendorShareSeries } from '../types'
 import { VendorLink } from './entity-links'
 
 const PERIOD_DESCRIPTIONS: Record<RankingPeriod, string> = {
+  yesterday: 'Vendor share yesterday',
   today: 'Token share by model author across the last 24 hours',
   week: 'Token share by model author across the past few weeks',
   month: 'Token share by model author across the past month',
@@ -93,6 +94,7 @@ type MarketShareSectionProps = {
   history: VendorShareSeries
   rows: VendorRanking[]
   period: RankingPeriod
+  metric?: 'calls' | 'tokens'
 }
 
 /**
@@ -121,12 +123,17 @@ export function MarketShareSection(props: MarketShareSectionProps) {
     const order = new Map(
       props.history.vendors.map((v, idx) => [v.name, idx] as const)
     )
-    return [...props.history.points].sort((a, b) => {
-      const tsCmp = a.ts.localeCompare(b.ts)
-      if (tsCmp !== 0) return tsCmp
-      return (order.get(a.vendor) ?? 999) - (order.get(b.vendor) ?? 999)
-    })
-  }, [props.history])
+    return props.history.points
+      .map((p) => ({
+        ...p,
+        value: props.metric === 'calls' ? (p.calls ?? 0) : p.tokens,
+      }))
+      .sort((a, b) => {
+        const tsCmp = a.ts.localeCompare(b.ts)
+        if (tsCmp !== 0) return tsCmp
+        return (order.get(a.vendor) ?? 999) - (order.get(b.vendor) ?? 999)
+      })
+  }, [props.history, props.metric])
 
   const spec = useMemo(() => {
     if (orderedPoints.length === 0) return null
@@ -172,7 +179,7 @@ export function MarketShareSection(props: MarketShareSectionProps) {
               key: (datum: Record<string, unknown>) =>
                 String(datum?.vendor ?? ''),
               value: (datum: Record<string, unknown>) =>
-                `${(Number(datum?.share) * 100).toFixed(1)}% · ${formatTokens(Number(datum?.tokens) || 0)}`,
+                `${(Number(datum?.share) * 100).toFixed(1)}% · ${formatTokens(Number(datum?.value) || 0)}`,
             },
           ],
         },
@@ -220,7 +227,9 @@ export function MarketShareSection(props: MarketShareSectionProps) {
           {t('Market Share')}
         </h2>
         <p className='text-muted-foreground mt-1 text-sm'>
-          {t(PERIOD_DESCRIPTIONS[props.period])}
+          {props.metric === 'calls'
+            ? t('Vendor share of generation calls in the selected period')
+            : t(PERIOD_DESCRIPTIONS[props.period])}
         </p>
       </header>
 
@@ -251,7 +260,11 @@ export function MarketShareSection(props: MarketShareSectionProps) {
             {t('By model author')}
           </h3>
           <p className='text-muted-foreground/80 mt-0.5 text-xs'>
-            {t('Vendors ranked by aggregated token volume')}
+            {t(
+              props.metric === 'calls'
+                ? 'Vendors ranked by generation calls'
+                : 'Vendors ranked by aggregated token volume'
+            )}
           </p>
         </header>
         {visible.length === 0 ? (
@@ -260,9 +273,17 @@ export function MarketShareSection(props: MarketShareSectionProps) {
           </div>
         ) : (
           <div className='grid grid-cols-1 gap-x-8 px-5 pt-1 pb-4 md:grid-cols-2'>
-            <VendorList rows={left} colourMap={colourMap} />
+            <VendorList
+              rows={left}
+              colourMap={colourMap}
+              metric={props.metric}
+            />
             {right.length > 0 && (
-              <VendorList rows={right} colourMap={colourMap} />
+              <VendorList
+                rows={right}
+                colourMap={colourMap}
+                metric={props.metric}
+              />
             )}
           </div>
         )}
@@ -274,6 +295,7 @@ export function MarketShareSection(props: MarketShareSectionProps) {
 function VendorList(props: {
   rows: VendorRanking[]
   colourMap: Record<string, string>
+  metric?: 'calls' | 'tokens'
 }) {
   return (
     <ul>
@@ -297,7 +319,11 @@ function VendorList(props: {
           </VendorLink>
           <div className='shrink-0 text-right'>
             <div className='text-foreground font-mono text-sm font-semibold tabular-nums'>
-              {formatTokens(vendor.total_tokens)}
+              {formatTokens(
+                props.metric === 'calls'
+                  ? (vendor.total_calls ?? 0)
+                  : vendor.total_tokens
+              )}
             </div>
             <div className='text-muted-foreground/80 font-mono text-[11px] tabular-nums'>
               {formatShare(vendor.share)}

@@ -28,8 +28,9 @@ import type { SuccessRatePoint } from '@/features/performance-metrics/types'
 import { cn } from '@/lib/utils'
 
 export type ModelPerfBadgeData = {
+  request_count?: number
   avg_latency_ms: number
-  success_rate: number
+  success_rate: number | null
   avg_tps: number
   recent_success_series?: SuccessRatePoint[]
 }
@@ -61,7 +62,9 @@ export const ModelPerfBadge = memo(function ModelPerfBadge(
     const currentHourStart = Math.floor(Date.now() / 1000 / 3600) * 3600
     const ratesByHour = new Map<number, number>()
     for (const point of props.perf?.recent_success_series ?? []) {
-      ratesByHour.set(point.ts, point.success_rate)
+      if (point.success_rate != null) {
+        ratesByHour.set(point.ts, point.success_rate)
+      }
     }
     return STATUS_SLOTS.map((slot) => {
       const hourStart = currentHourStart - (23 - slot) * 3600
@@ -80,7 +83,12 @@ export const ModelPerfBadge = memo(function ModelPerfBadge(
       <dl className='flex min-w-0 items-start gap-5 text-xs tabular-nums'>
         <div className='w-24 shrink-0'>
           <dt
-            title={t('Request success rate sampled over the last 24 hours')}
+            title={
+              t('Request success rate sampled over the last 24 hours') +
+              (props.perf?.request_count == null
+                ? ''
+                : ` · ${t('Samples')}: ${props.perf.request_count}`)
+            }
             className='text-muted-foreground flex items-center justify-between gap-1 text-[11px] leading-4'
           >
             <span>{t('Status')}</span>
@@ -135,6 +143,11 @@ export const ModelPerfBadge = memo(function ModelPerfBadge(
           </dd>
         </div>
       </dl>
+      {props.perf?.request_count != null && (
+        <span className='text-muted-foreground shrink-0 text-[10px]'>
+          {t('{{count}} samples', { count: props.perf.request_count })}
+        </span>
+      )}
       {props.children}
     </div>
   )

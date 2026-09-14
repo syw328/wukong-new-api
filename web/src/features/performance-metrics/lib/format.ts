@@ -28,8 +28,8 @@ export function formatLatency(ms: number): string {
   return `${Math.round(ms)}ms`
 }
 
-export function formatUptimePct(pct: number): string {
-  if (!Number.isFinite(pct)) return '—'
+export function formatUptimePct(pct: number | null): string {
+  if (pct == null || !Number.isFinite(pct)) return '—'
   return `${pct.toFixed(2)}%`
 }
 
@@ -52,8 +52,8 @@ const SUCCESS_RATE_WARNING_MIN = 70
  * - critical: below 70%
  * - unknown: non-finite values
  */
-export function getSuccessRateLevel(rate: number): SuccessRateLevel {
-  if (!Number.isFinite(rate)) return 'unknown'
+export function getSuccessRateLevel(rate: number | null): SuccessRateLevel {
+  if (rate == null || !Number.isFinite(rate)) return 'unknown'
   if (rate >= SUCCESS_RATE_EXCELLENT_MIN) return 'excellent'
   if (rate >= SUCCESS_RATE_GOOD_MIN) return 'good'
   if (rate >= SUCCESS_RATE_WARNING_MIN) return 'warning'
@@ -85,14 +85,14 @@ const SUCCESS_RATE_HEX_COLOR: Record<SuccessRateLevel, string> = {
   unknown: '#9ca3af', // gray-400
 }
 
-export function getSuccessRateTextClass(rate: number): string {
+export function getSuccessRateTextClass(rate: number | null): string {
   return SUCCESS_RATE_TEXT_CLASS[getSuccessRateLevel(rate)]
 }
 
-export function getSuccessRateDotClass(rate: number): string {
+export function getSuccessRateDotClass(rate: number | null): string {
   return SUCCESS_RATE_DOT_CLASS[getSuccessRateLevel(rate)]
 }
 
-export function getSuccessRateColor(rate: number): string {
+export function getSuccessRateColor(rate: number | null): string {
   return SUCCESS_RATE_HEX_COLOR[getSuccessRateLevel(rate)]
 }

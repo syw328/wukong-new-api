@@ -8,6 +8,9 @@ import (
 )
 
 func GetRankings(c *gin.Context) {
+	if proxyPlatformInsights(c, "rankings") {
+		return
+	}
 	result, err := service.GetRankingsSnapshot(c.DefaultQuery("period", "week"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{

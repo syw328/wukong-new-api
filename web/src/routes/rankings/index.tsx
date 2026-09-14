@@ -24,8 +24,13 @@ import { getModuleAccessForGuard } from '@/lib/nav-modules'
 import { useAuthStore } from '@/stores/auth-store'
 
 const rankingsSearchSchema = z.object({
+  metric: z.enum(['calls', 'tokens']).optional().catch(undefined),
+  category: z
+    .enum(['all', 'chat', 'image', 'video', 'audio'])
+    .optional()
+    .catch(undefined),
   period: z
-    .enum(['today', 'week', 'month', 'year'])
+    .enum(['today', 'yesterday', 'week', 'month', 'year'])
     .optional()
     .catch(undefined),
 })

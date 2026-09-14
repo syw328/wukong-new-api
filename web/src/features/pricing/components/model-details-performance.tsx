@@ -25,7 +25,9 @@ import {
   StaticDataTable,
   staticDataTableClassNames as tableStyles,
 } from '@/components/data-table'
+import { ErrorState } from '@/components/error-state'
 import { GroupBadge } from '@/components/group-badge'
+import { LoadingState } from '@/components/loading-state'
 import { getPerfMetrics } from '@/features/performance-metrics/api'
 import {
   formatLatency,
@@ -77,12 +79,12 @@ type PerformanceRow = {
   group: string
   avg_ttft_ms: number
   avg_latency_ms: number
-  success_rate: number
+  success_rate: number | null
   avg_tps: number
 }
 
-function toUptimePct(value: number): number {
-  if (!Number.isFinite(value)) return 0
+function toUptimePct(value: number | null): number {
+  if (value == null || !Number.isFinite(value)) return Number.NaN
   const clamped = Math.min(100, Math.max(0, value))
   return Math.round(clamped * 100) / 100
 }
@@ -169,6 +171,7 @@ export function ModelDetailsPerformance(props: { model: PricingModel }) {
     queryFn: async () =>
       requireServerSuccess(await getPerfMetrics(props.model.model_name, 24)),
     staleTime: 60 * 1000,
+    refetchInterval: 60_000,
   })
   const groups = useMemo(
     () => metricsQuery.data?.data.groups ?? [],
@@ -195,7 +198,16 @@ export function ModelDetailsPerformance(props: { model: PricingModel }) {
     return map
   }, [groups])
 
-  if (metricsQuery.isLoading || performances.length === 0) {
+  if (metricsQuery.isLoading) return <LoadingState />
+  if (metricsQuery.isError) {
+    return (
+      <ErrorState
+        title={t('Unable to load model statistics')}
+        onRetry={() => void metricsQuery.refetch()}
+      />
+    )
+  }
+  if (performances.length === 0) {
     return (
       <div className='text-muted-foreground rounded-lg border p-6 text-center text-sm'>
         {t('Performance data is not yet available for this model.')}
@@ -213,16 +225,23 @@ export function ModelDetailsPerformance(props: { model: PricingModel }) {
   const avgLatency = average(performances, 'avg_latency_ms')
   const successRates = performances
     .map((perf) => perf.success_rate)
-    .filter((value) => Number.isFinite(value))
+    .filter((value): value is number => value != null && Number.isFinite(value))
   const successRate =
     successRates.length > 0
       ? successRates.reduce((sum, value) => sum + value, 0) /
         successRates.length
       : 0
   const incidentCount = uptimeSeries.reduce((s, p) => s + p.incidents, 0)
+  const samples = groups.reduce((n, group) => n + (group.request_count ?? 0), 0)
 
   return (
     <div className='flex flex-col gap-4'>
+      <p className='text-muted-foreground text-xs'>
+        {t(
+          'Last 24 hourly buckets, including the current hour. Success rate excludes pending and unknown outcomes. Latency uses successful requests only.'
+        )}{' '}
+        {t('{{count}} samples', { count: samples })}
+      </p>
       <div className='grid grid-cols-1 gap-2 sm:grid-cols-3'>
         <StatCard
           icon={Timer}
@@ -241,10 +260,10 @@ export function ModelDetailsPerformance(props: { model: PricingModel }) {
           value={formatUptimePct(successRate)}
           hint={
             incidentCount > 0
-              ? t('{{count}} incidents in the last 24 hours', {
+              ? t('{{count}} hourly buckets contain failures', {
                   count: incidentCount,
                 })
-              : t('No incidents in the last 24 hours')
+              : t('No failures in the recorded samples')
           }
           valueClassName={getSuccessRateTextClass(successRate)}
         />
@@ -323,7 +342,7 @@ export function ModelDetailsPerformance(props: { model: PricingModel }) {
           description={
             incidentCount > 0
               ? t(
-                  'Request success rate; {{incidents}} incident buckets in the last 24 hours',
+                  'Request success rate; {{incidents}} hourly buckets contain failures',
                   {
                     incidents: incidentCount,
                   }
@@ -334,7 +353,7 @@ export function ModelDetailsPerformance(props: { model: PricingModel }) {
             incidentCount > 0 ? (
               <span className='inline-flex items-center gap-1 text-amber-600 dark:text-amber-400'>
                 <AlertTriangle className='size-3.5' />
-                {t('{{count}} incidents', {
+                {t('{{count}} failure buckets', {
                   count: incidentCount,
                 })}
               </span>

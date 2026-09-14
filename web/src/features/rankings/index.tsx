@@ -19,9 +19,11 @@ For commercial licensing, please contact support@quantumnous.com
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
+import { ErrorState } from '@/components/error-state'
 import { PublicLayout } from '@/components/layout'
 import { PageTransition } from '@/components/page-transition'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 import {
   MarketShareSection,
@@ -30,22 +32,30 @@ import {
   RankingsHero,
 } from './components'
 import { useRankings } from './hooks/use-rankings'
-import type { RankingPeriod } from './types'
+import type { RankingPeriod, RankingMetric, RankingModality } from './types'
 
-const VALID_PERIODS: RankingPeriod[] = ['today', 'week', 'month', 'year']
+const VALID_PERIODS = new Set<RankingPeriod>([
+  'today',
+  'yesterday',
+  'week',
+  'month',
+  'year',
+])
 
 export function Rankings() {
   const { t } = useTranslation()
   const search = useSearch({ from: '/rankings/' })
   const navigate = useNavigate()
 
-  const period: RankingPeriod = VALID_PERIODS.includes(
+  const period: RankingPeriod = VALID_PERIODS.has(
     search.period as RankingPeriod
   )
     ? (search.period as RankingPeriod)
     : 'week'
 
-  const rankingsQuery = useRankings(period)
+  const metric: RankingMetric = search.metric ?? 'calls'
+  const category: RankingModality = search.category ?? 'all'
+  const rankingsQuery = useRankings(period, metric, category)
   const snapshot = rankingsQuery.data?.data
 
   const handlePeriodChange = (next: RankingPeriod) => {
@@ -53,6 +63,46 @@ export function Rankings() {
       to: '/rankings',
       search: (prev) => ({ ...prev, period: next }),
     })
+  }
+
+  let content
+  if (rankingsQuery.isLoading) {
+    content = <RankingsLoading />
+  } else if (rankingsQuery.isError || !snapshot) {
+    content = (
+      <ErrorState
+        title={t('Unable to load rankings')}
+        onRetry={() => void rankingsQuery.refetch()}
+        description={
+          rankingsQuery.error instanceof Error
+            ? rankingsQuery.error.message
+            : t('Unable to load rankings data')
+        }
+      />
+    )
+  } else {
+    content = (
+      <>
+        <ModelsSection
+          history={snapshot.models_history}
+          rows={snapshot.models}
+          period={period}
+          metric={snapshot.metric ?? 'tokens'}
+        />
+
+        <MarketShareSection
+          history={snapshot.vendor_share_history}
+          rows={snapshot.vendors}
+          period={period}
+          metric={snapshot.metric ?? 'tokens'}
+        />
+
+        <PulseSection
+          movers={snapshot.top_movers}
+          droppers={snapshot.top_droppers}
+        />
+      </>
+    )
   }
 
   return (
@@ -75,37 +125,75 @@ export function Rankings() {
         />
         <PageTransition className='relative mx-auto w-full max-w-[1280px] space-y-8 px-3 pt-16 pb-10 sm:px-6 sm:pt-20 sm:pb-12 xl:px-8'>
           <RankingsHero period={period} onPeriodChange={handlePeriodChange} />
-
-          {rankingsQuery.isLoading ? (
-            <RankingsLoading />
-          ) : !snapshot ? (
-            <RankingsError
-              message={
-                rankingsQuery.error instanceof Error
-                  ? rankingsQuery.error.message
-                  : t('Unable to load rankings data')
-              }
-            />
-          ) : (
-            <>
-              <ModelsSection
-                history={snapshot.models_history}
-                rows={snapshot.models}
-                period={period}
-              />
-
-              <MarketShareSection
-                history={snapshot.vendor_share_history}
-                rows={snapshot.vendors}
-                period={period}
-              />
-
-              <PulseSection
-                movers={snapshot.top_movers}
-                droppers={snapshot.top_droppers}
-              />
-            </>
+          <div className='flex flex-wrap gap-4'>
+            <Tabs
+              value={metric}
+              onValueChange={(value) => {
+                void navigate({
+                  to: '/rankings',
+                  search: (prev) => ({
+                    ...prev,
+                    metric: value as RankingMetric,
+                  }),
+                })
+              }}
+            >
+              <TabsList aria-label={t('Ranking metric')}>
+                <TabsTrigger value='calls'>{t('Calls')}</TabsTrigger>
+                <TabsTrigger value='tokens'>{t('Token usage')}</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Tabs
+              value={category}
+              onValueChange={(value) => {
+                void navigate({
+                  to: '/rankings',
+                  search: (prev) => ({
+                    ...prev,
+                    category: value as RankingModality,
+                  }),
+                })
+              }}
+            >
+              <TabsList
+                aria-label={t('Model type')}
+                className='h-auto flex-wrap'
+              >
+                {(['all', 'chat', 'image', 'video', 'audio'] as const).map(
+                  (value) => (
+                    <TabsTrigger key={value} value={value}>
+                      {t(
+                        {
+                          all: 'All',
+                          chat: 'Chat',
+                          image: 'Image',
+                          video: 'Video',
+                          audio: 'Audio',
+                        }[value]
+                      )}
+                    </TabsTrigger>
+                  )
+                )}
+              </TabsList>
+            </Tabs>
+          </div>
+          {snapshot?.source === 'platform' && (
+            <p className='text-muted-foreground text-xs'>
+              {t(
+                'Platform website and API generation records. Retries count separately; public variants sharing one model are counted once. New API logs are not added again. This is a usage ranking, not a quality benchmark.'
+              )}
+            </p>
           )}
+          {snapshot?.range && (
+            <p className='text-muted-foreground text-xs'>
+              {t('Statistics range')}:{' '}
+              {new Date(snapshot.range.start).toLocaleString()} –{' '}
+              {new Date(snapshot.range.end).toLocaleString()} ·{' '}
+              {snapshot.range.timezone}
+            </p>
+          )}
+
+          {content}
         </PageTransition>
       </div>
     </PublicLayout>
@@ -118,20 +206,6 @@ function RankingsLoading() {
       <Skeleton className='h-[420px] w-full rounded-xl' />
       <Skeleton className='h-[360px] w-full rounded-xl' />
       <Skeleton className='h-[180px] w-full rounded-xl' />
-    </div>
-  )
-}
-
-function RankingsError(props: { message: string }) {
-  const { t } = useTranslation()
-  return (
-    <div className='bg-card rounded-xl border border-dashed px-6 py-12 text-center'>
-      <h2 className='text-foreground text-base font-semibold'>
-        {t('Unable to load rankings')}
-      </h2>
-      <p className='text-muted-foreground mx-auto mt-2 max-w-md text-sm'>
-        {props.message}
-      </p>
     </div>
   )
 }

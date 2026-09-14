@@ -22,9 +22,16 @@ For commercial licensing, please contact support@quantumnous.com
 //
 // Shape of the real data shown on the /rankings page.
 
-export type RankingPeriod = 'today' | 'week' | 'month' | 'year'
+export type RankingPeriod = 'today' | 'yesterday' | 'week' | 'month' | 'year'
+
+export type RankingMetric = 'calls' | 'tokens'
+export type RankingModality = 'all' | 'chat' | 'image' | 'video' | 'audio'
 
 export type RankingCategoryId =
+  | 'chat'
+  | 'image'
+  | 'video'
+  | 'audio'
   | 'all'
   | 'programming'
   | 'roleplay'
@@ -43,15 +50,17 @@ export type ModelRanking = {
   /** Previous rank in the same period; undefined means "new". */
   previous_rank?: number
   model_name: string
+  display_name?: string
   vendor: string
   vendor_icon?: string
   category: RankingCategoryId
   /** Total tokens routed through this model in the period. */
   total_tokens: number
+  total_calls?: number
   /** Share of all tokens served (0..1). */
   share: number
   /** Period-over-period change in token volume (%). */
-  growth_pct: number
+  growth_pct: number | null
 }
 
 export type VendorRanking = {
@@ -59,8 +68,9 @@ export type VendorRanking = {
   vendor: string
   vendor_icon?: string
   total_tokens: number
+  total_calls?: number
   share: number
-  growth_pct: number
+  growth_pct: number | null
   /** Number of distinct models from this vendor with traffic. */
   models_count: number
   /** Top model from this vendor in the period. */
@@ -68,14 +78,16 @@ export type VendorRanking = {
 }
 
 export type RankingMover = {
+  category?: RankingCategoryId
   model_name: string
+  display_name?: string
   vendor: string
   vendor_icon?: string
   /** Positive = climbed, negative = dropped. */
   rank_delta: number
   current_rank: number
   /** Token-volume change percent. */
-  growth_pct: number
+  growth_pct: number | null
 }
 
 /**
@@ -91,6 +103,7 @@ export type ModelHistoryPoint = {
   vendor: string
   /** Token count routed through the model in this bucket. */
   tokens: number
+  calls?: number
 }
 
 export type ModelHistorySeries = {
@@ -113,6 +126,7 @@ export type VendorSharePoint = {
   vendor: string
   share: number
   tokens: number
+  calls?: number
 }
 
 export type VendorShareSeries = {
@@ -124,6 +138,10 @@ export type VendorShareSeries = {
 }
 
 export type RankingsSnapshot = {
+  source?: string
+  metric?: RankingMetric
+  range?: { start: string; end: string; timezone: string }
+  generated_at?: string
   // Overall (all categories) ------------------------------------------------
   models: ModelRanking[]
   vendors: VendorRanking[]

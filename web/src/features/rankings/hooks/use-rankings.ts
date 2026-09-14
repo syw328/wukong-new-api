@@ -21,12 +21,18 @@ import { useQuery } from '@tanstack/react-query'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
 import { getRankings } from '../api'
-import type { RankingPeriod } from '../types'
+import type { RankingPeriod, RankingMetric, RankingModality } from '../types'
 
-export function useRankings(period: RankingPeriod) {
+export function useRankings(
+  period: RankingPeriod,
+  metric: RankingMetric,
+  category: RankingModality
+) {
   return useQuery({
-    queryKey: ['rankings', period],
-    queryFn: async () => requireServerSuccess(await getRankings(period)),
+    queryKey: ['rankings', period, metric, category],
+    queryFn: async () =>
+      requireServerSuccess(await getRankings(period, metric, category)),
+    refetchInterval: 60_000,
     staleTime: 5 * 60 * 1000,
   })
 }

@@ -12,6 +12,9 @@ import (
 )
 
 func GetPerfMetricsSummary(c *gin.Context) {
+	if proxyPlatformInsights(c, "metrics") {
+		return
+	}
 	hours := 24
 	if rawHours := c.Query("hours"); rawHours != "" {
 		if parsed, err := strconv.Atoi(rawHours); err == nil {
@@ -36,6 +39,9 @@ func GetPerfMetricsSummary(c *gin.Context) {
 }
 
 func GetPerfMetrics(c *gin.Context) {
+	if c.Query("model") != "" && proxyPlatformInsights(c, "metrics") {
+		return
+	}
 	modelName := c.Query("model")
 	if modelName == "" {
 		c.JSON(http.StatusBadRequest, gin.H{

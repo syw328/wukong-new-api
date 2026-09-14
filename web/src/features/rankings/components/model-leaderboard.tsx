@@ -27,6 +27,7 @@ import { GrowthText } from './growth-text'
 
 type ModelLeaderboardProps = {
   rows: ModelRanking[]
+  metric?: 'calls' | 'tokens'
   /** Density variant. `compact` is used inside per-category sections; the
    * default fits the larger overall "Top Models" section. */
   variant?: 'default' | 'compact'
@@ -56,14 +57,17 @@ export function ModelLeaderboard(props: ModelLeaderboardProps) {
 
   return (
     <div className='grid grid-cols-1 gap-x-8 md:grid-cols-2'>
-      <ModelList rows={left} variant={variant} />
-      {right.length > 0 && <ModelList rows={right} variant={variant} />}
+      <ModelList rows={left} variant={variant} metric={props.metric} />
+      {right.length > 0 && (
+        <ModelList rows={right} variant={variant} metric={props.metric} />
+      )}
     </div>
   )
 }
 
 function ModelList(props: {
   rows: ModelRanking[]
+  metric?: 'calls' | 'tokens'
   variant: 'default' | 'compact'
 }) {
   const { t } = useTranslation()
@@ -86,16 +90,22 @@ function ModelList(props: {
             {getLobeIcon(row.vendor_icon, compact ? 20 : 22)}
           </span>
           <div className='min-w-0 flex-1'>
-            <ModelLink
-              modelName={row.model_name}
-              className={
-                compact
-                  ? 'text-foreground block truncate font-mono text-xs font-medium'
-                  : 'text-foreground block truncate font-mono text-sm font-medium'
-              }
-            >
-              {row.model_name}
-            </ModelLink>
+            {row.category === 'chat' || row.category === 'all' ? (
+              <ModelLink
+                modelName={row.model_name}
+                className={
+                  compact
+                    ? 'text-foreground block truncate font-mono text-xs font-medium'
+                    : 'text-foreground block truncate font-mono text-sm font-medium'
+                }
+              >
+                {row.display_name || row.model_name}
+              </ModelLink>
+            ) : (
+              <span className='text-foreground block truncate text-sm font-medium'>
+                {row.display_name || row.model_name}
+              </span>
+            )}
             <p
               className={
                 compact
@@ -117,12 +127,16 @@ function ModelList(props: {
                   : 'text-foreground font-mono text-sm font-semibold tabular-nums'
               }
             >
-              {formatTokens(row.total_tokens)}
+              {formatTokens(
+                props.metric === 'calls'
+                  ? (row.total_calls ?? 0)
+                  : row.total_tokens
+              )}
               {!compact && (
                 <>
                   {' '}
                   <span className='text-muted-foreground/80 font-normal'>
-                    {t('tokens')}
+                    {t(props.metric === 'calls' ? 'calls' : 'tokens')}
                   </span>
                 </>
               )}

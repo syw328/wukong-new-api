@@ -29,8 +29,9 @@ import type { ModelHistorySeries, ModelRanking, RankingPeriod } from '../types'
 import { ModelLeaderboard } from './model-leaderboard'
 
 const PERIOD_DESCRIPTIONS: Record<RankingPeriod, string> = {
+  yesterday: 'Hourly usage by model yesterday',
   today: 'Hourly token usage by model across the last 24 hours',
-  week: 'Weekly token usage by model across the past few weeks',
+  week: 'Daily usage by model across the last 7 days',
   month: 'Daily token usage by model across the past month',
   year: 'Weekly token usage by model across the past year',
 }
@@ -41,6 +42,7 @@ type ModelsSectionProps = {
   history: ModelHistorySeries
   rows: ModelRanking[]
   period: RankingPeriod
+  metric?: 'calls' | 'tokens'
 }
 
 /**
@@ -65,16 +67,27 @@ export function ModelsSection(props: ModelsSectionProps) {
     const order = new Map(
       props.history.models.map((m, idx) => [m.name, idx] as const)
     )
-    return [...props.history.points].sort((a, b) => {
-      const tsCmp = a.ts.localeCompare(b.ts)
-      if (tsCmp !== 0) return tsCmp
-      return (order.get(a.model) ?? 999) - (order.get(b.model) ?? 999)
-    })
-  }, [props.history])
+    return props.history.points
+      .map((p) => ({
+        ...p,
+        value: props.metric === 'calls' ? (p.calls ?? 0) : p.tokens,
+      }))
+      .sort((a, b) => {
+        const tsCmp = a.ts.localeCompare(b.ts)
+        if (tsCmp !== 0) return tsCmp
+        return (order.get(a.model) ?? 999) - (order.get(b.model) ?? 999)
+      })
+  }, [props.history, props.metric])
 
   const totalTokens = useMemo(
-    () => props.rows.reduce((s, r) => s + r.total_tokens, 0),
-    [props.rows]
+    () =>
+      props.rows.reduce(
+        (s, r) =>
+          s +
+          (props.metric === 'calls' ? (r.total_calls ?? 0) : r.total_tokens),
+        0
+      ),
+    [props.rows, props.metric]
   )
 
   const spec = useMemo(() => {
@@ -83,7 +96,7 @@ export function ModelsSection(props: ModelsSectionProps) {
       type: 'bar' as const,
       data: [{ id: 'models-history', values: orderedPoints }],
       xField: 'label',
-      yField: 'tokens',
+      yField: 'value',
       seriesField: 'model',
       stack: true,
       legends: { visible: false },
@@ -116,7 +129,7 @@ export function ModelsSection(props: ModelsSectionProps) {
               key: (datum: Record<string, unknown>) =>
                 String(datum?.model ?? ''),
               value: (datum: Record<string, unknown>) =>
-                formatTokens(Number(datum?.tokens) || 0),
+                formatTokens(Number(datum?.value) || 0),
             },
           ],
         },
@@ -130,7 +143,7 @@ export function ModelsSection(props: ModelsSectionProps) {
               key: (datum: Record<string, unknown>) =>
                 String(datum?.model ?? ''),
               value: (datum: Record<string, unknown>) =>
-                Number(datum?.tokens) || 0,
+                Number(datum?.value) || 0,
             },
           ],
           updateContent: (
@@ -173,15 +186,19 @@ export function ModelsSection(props: ModelsSectionProps) {
             {t('Top Models')}
           </h2>
           <p className='text-muted-foreground mt-1 text-sm'>
-            {t(PERIOD_DESCRIPTIONS[props.period])}
+            {props.metric === 'calls'
+              ? t('Generation call counts by model in the selected period')
+              : t(PERIOD_DESCRIPTIONS[props.period])}
           </p>
         </div>
         <div className='shrink-0 text-right'>
           <div className='text-foreground font-mono text-2xl font-semibold tabular-nums'>
-            {formatTokens(totalTokens)}
+            {props.metric === 'calls'
+              ? totalTokens.toLocaleString()
+              : formatTokens(totalTokens)}
           </div>
           <div className='text-muted-foreground/80 text-[10px] font-medium tracking-widest uppercase'>
-            {t('tokens')}
+            {t(props.metric === 'calls' ? 'calls' : 'tokens')}
           </div>
         </div>
       </header>
@@ -223,7 +240,7 @@ export function ModelsSection(props: ModelsSectionProps) {
           </div>
         ) : (
           <div className='px-5 pt-1 pb-4'>
-            <ModelLeaderboard rows={props.rows} />
+            <ModelLeaderboard rows={props.rows} metric={props.metric} />
           </div>
         )}
       </div>
