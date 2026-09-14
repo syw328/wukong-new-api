@@ -1,3 +1,4 @@
+import { portalRuntime } from '@/lib/portal-runtime'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -21,6 +22,12 @@ For commercial licensing, please contact support@quantumnous.com
  * Replaces js-cookie dependency for better consistency
  */
 
+function portalCookieName(name: string): string {
+  return portalRuntime().basePath && !name.startsWith('new_api_')
+    ? `newapi_portal_${name}`
+    : name
+}
+
 const DEFAULT_MAX_AGE = 60 * 60 * 24 * 7 // 7 days
 
 /**
@@ -30,7 +37,7 @@ export function getCookie(name: string): string | undefined {
   if (typeof document === 'undefined') return undefined
 
   const value = `; ${document.cookie}`
-  const parts = value.split(`; ${name}=`)
+  const parts = value.split(`; ${portalCookieName(name)}=`)
   if (parts.length === 2) {
     const cookieValue = parts.pop()?.split(';').shift()
     return cookieValue
@@ -48,7 +55,7 @@ export function setCookie(
 ): void {
   if (typeof document === 'undefined') return
 
-  document.cookie = `${name}=${value}; path=/; max-age=${maxAge}`
+  document.cookie = `${portalCookieName(name)}=${value}; path=${portalRuntime().basePath || '/'}; max-age=${maxAge}; SameSite=Lax`
 }
 
 /**
@@ -57,5 +64,5 @@ export function setCookie(
 export function removeCookie(name: string): void {
   if (typeof document === 'undefined') return
 
-  document.cookie = `${name}=; path=/; max-age=0`
+  document.cookie = `${portalCookieName(name)}=; path=${portalRuntime().basePath || '/'}; max-age=0`
 }

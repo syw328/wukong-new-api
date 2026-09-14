@@ -54,6 +54,7 @@ import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { getUserModels } from '@/lib/api'
 import { handleServerError } from '@/lib/handle-server-error'
 import { MOTION_TRANSITION } from '@/lib/motion'
+import { portalLocalStorage, portalApiOrigin } from '@/lib/portal-runtime'
 import { ROLE } from '@/lib/roles'
 import { requireServerSuccess } from '@/lib/server-error-message'
 import { cn } from '@/lib/utils'
@@ -126,7 +127,7 @@ interface HeroSignal {
 
 function getSavedSetupGuideExpanded(): boolean | null {
   if (typeof window === 'undefined') return null
-  const saved = window.localStorage.getItem(SETUP_GUIDE_VISIBILITY_STORAGE_KEY)
+  const saved = portalLocalStorage.getItem(SETUP_GUIDE_VISIBILITY_STORAGE_KEY)
   if (saved === 'expanded') return true
   if (saved === 'collapsed') return false
   return null
@@ -134,7 +135,7 @@ function getSavedSetupGuideExpanded(): boolean | null {
 
 function saveSetupGuideExpanded(expanded: boolean): void {
   if (typeof window === 'undefined') return
-  window.localStorage.setItem(
+  portalLocalStorage.setItem(
     SETUP_GUIDE_VISIBILITY_STORAGE_KEY,
     expanded ? 'expanded' : 'collapsed'
   )
@@ -142,7 +143,7 @@ function saveSetupGuideExpanded(expanded: boolean): void {
 
 function getCurrentOrigin(): string {
   if (typeof window === 'undefined') return ''
-  return window.location.origin
+  return portalApiOrigin()
 }
 
 function normalizeEndpoint(sourceUrl?: string): string {

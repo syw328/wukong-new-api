@@ -1,3 +1,4 @@
+import { portalInternalPath } from '@/lib/portal-runtime'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -76,5 +77,7 @@ export function sanitizeAuthRedirect(
     return null
   }
 
-  return `${redirectURL.pathname}${redirectURL.search}${redirectURL.hash}`
+  return portalInternalPath(
+    `${redirectURL.pathname}${redirectURL.search}${redirectURL.hash}`
+  )
 }

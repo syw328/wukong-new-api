@@ -39,6 +39,8 @@ import {
 } from '@tanstack/react-table'
 import * as React from 'react'
 
+import { portalLocalStorage } from '@/lib/portal-runtime'
+
 type DataTableFeatureOptions<TData> = Pick<
   TableOptions<TData>,
   | 'enableRowSelection'
@@ -149,7 +151,7 @@ function readColumnVisibility(storageKey: string | undefined): VisibilityState {
   if (!storageKey || typeof window === 'undefined') return {}
 
   try {
-    const raw = window.localStorage.getItem(storageKey)
+    const raw = portalLocalStorage.getItem(storageKey)
     if (!raw) return {}
 
     const parsed = JSON.parse(raw) as unknown
@@ -251,7 +253,7 @@ function readColumnSizing(
   if (!storageKey || typeof window === 'undefined') return {}
 
   try {
-    const raw = window.localStorage.getItem(storageKey)
+    const raw = portalLocalStorage.getItem(storageKey)
     if (!raw) return {}
 
     const parsed = JSON.parse(raw) as unknown
@@ -479,7 +481,7 @@ export function useDataTable<TData>(options: UseDataTableOptions<TData>) {
     }
 
     try {
-      window.localStorage.setItem(
+      portalLocalStorage.setItem(
         columnVisibilityStorageKey,
         JSON.stringify(columnVisibility)
       )
@@ -502,7 +504,7 @@ export function useDataTable<TData>(options: UseDataTableOptions<TData>) {
 
     columnSizingPersistTimerRef.current = window.setTimeout(() => {
       try {
-        window.localStorage.setItem(
+        portalLocalStorage.setItem(
           columnSizingStorageKey,
           JSON.stringify(columnSizing)
         )

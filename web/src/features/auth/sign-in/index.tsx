@@ -20,6 +20,7 @@ import { Link, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 import { useStatus } from '@/hooks/use-status'
+import { portalRuntime } from '@/lib/portal-runtime'
 
 import { AuthLayout } from '../auth-layout'
 import { TermsFooter } from '../components/terms-footer'
@@ -52,7 +53,12 @@ export function SignIn() {
             )}
         </div>
 
-        <UserAuthForm redirectTo={redirect} autoProvider={provider} />
+        <UserAuthForm
+          redirectTo={redirect}
+          autoProvider={
+            provider || (portalRuntime().basePath ? 'platform' : undefined)
+          }
+        />
 
         <TermsFooter
           variant='sign-in'

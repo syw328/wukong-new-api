@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { SSE } from 'sse.js'
 
 import { getFreshAuthHeaders } from '@/lib/api'
+import { portalRequestPath } from '@/lib/portal-runtime'
 
 import { API_ENDPOINTS, ERROR_MESSAGES } from '../constants'
 import {
@@ -192,7 +193,7 @@ export function useStreamRequest() {
     controllerRef.current = createStreamRequestController({
       getHeaders: getFreshAuthHeaders,
       createSource: (payload, headers) =>
-        new SSE(API_ENDPOINTS.CHAT_COMPLETIONS, {
+        new SSE(portalRequestPath(API_ENDPOINTS.CHAT_COMPLETIONS), {
           headers,
           method: 'POST',
           payload: JSON.stringify(payload),

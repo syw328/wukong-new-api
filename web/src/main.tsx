@@ -23,8 +23,13 @@ import ReactDOM from 'react-dom/client'
 
 import { installBuildMetadata } from '@/lib/build-metadata'
 import { applyFaviconToDom } from '@/lib/dom-utils'
-import '@/lib/dayjs'
 import { initializeFrontendCache } from '@/lib/frontend-cache'
+import '@/lib/dayjs'
+import {
+  portalRuntime,
+  portalRoutePath,
+  portalInternalPath,
+} from '@/lib/portal-runtime'
 import { createAppQueryClient } from '@/lib/query-client'
 import { readCachedStatus, statusQueryOptions } from '@/lib/status-query'
 
@@ -49,6 +54,17 @@ const queryClient = createAppQueryClient(() => {
 
 // Create a new router instance
 const router = createRouter({
+  basepath: portalRuntime().basePath || '/',
+  rewrite: {
+    input: ({ url }) => {
+      url.pathname = portalInternalPath(url.pathname)
+      return url
+    },
+    output: ({ url }) => {
+      url.pathname = portalRoutePath(url.pathname)
+      return url
+    },
+  },
   routeTree,
   context: { queryClient },
   defaultPreload: 'intent',

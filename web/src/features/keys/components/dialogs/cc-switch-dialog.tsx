@@ -27,6 +27,7 @@ import { ComboboxInput } from '@/components/ui/combobox-input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { getUserModels } from '@/lib/api'
+import { portalLocalStorage } from '@/lib/portal-runtime'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
 const APP_CONFIGS = {
@@ -56,7 +57,7 @@ type AppType = keyof typeof APP_CONFIGS
 
 function getServerAddress(): string {
   try {
-    const raw = localStorage.getItem('status')
+    const raw = portalLocalStorage.getItem('status')
     if (raw) {
       const status = JSON.parse(raw)
       if (status.server_address) return status.server_address

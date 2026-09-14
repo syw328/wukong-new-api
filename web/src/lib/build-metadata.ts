@@ -1,3 +1,4 @@
+import { portalLocalStorage } from '@/lib/portal-runtime'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -146,7 +147,7 @@ export function installBuildMetadata(): void {
 
   // Persisted revision so other modules can derive cache keys from it.
   try {
-    window.localStorage.setItem(LS_REVISION_KEY, rev)
+    portalLocalStorage.setItem(LS_REVISION_KEY, rev)
   } catch {
     // Storage can be unavailable (private mode, disabled cookies, …).
   }

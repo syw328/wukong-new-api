@@ -22,6 +22,7 @@ import { toast } from 'sonner'
 
 import { clearAuthentication } from '@/lib/api'
 import { handleServerError } from '@/lib/handle-server-error'
+import { portalPagePath, portalRuntime } from '@/lib/portal-runtime'
 import { AuthOperationError } from '@/lib/secure-verification'
 import { createServerError } from '@/lib/server-error-message'
 
@@ -204,8 +205,12 @@ export function useOAuthLogin(
       const state = await createOAuthFlow(provider.slug, 'login')
       rememberOAuthLoginRedirect(state, redirectTo)
 
-      const redirectUri = `${window.location.origin}/oauth/${provider.slug}`
-      const url = new URL(provider.authorization_endpoint)
+      const redirectUri = `${window.location.origin}${portalPagePath(`/oauth/${provider.slug}`)}`
+      const url = new URL(
+        provider.slug === 'platform' && portalRuntime().basePath
+          ? `${window.location.origin}/api/oauth/authorize`
+          : provider.authorization_endpoint
+      )
       url.searchParams.set('client_id', provider.client_id)
       url.searchParams.set('redirect_uri', redirectUri)
       url.searchParams.set('response_type', 'code')

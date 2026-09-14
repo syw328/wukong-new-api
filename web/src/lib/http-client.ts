@@ -26,6 +26,7 @@ import {
   refreshAuthentication,
 } from '@/lib/auth-session'
 import { handleServerError } from '@/lib/handle-server-error'
+import { portalRuntime, portalPagePath } from '@/lib/portal-runtime'
 import {
   getServerErrorMessage,
   safeServerErrorMessage,
@@ -47,7 +48,7 @@ declare module 'axios' {
 export type ApiRequestConfig = AxiosRequestConfig
 
 export const api = axios.create({
-  baseURL: '',
+  baseURL: portalRuntime().transportPath,
   withCredentials: true,
   headers: {
     // no-store forbids storage; no-cache also revalidates any older cached response.
@@ -77,9 +78,9 @@ api.get = ((url: string, config: ApiRequestConfig = {}) => {
 function redirectToSignIn(): void {
   if (
     typeof window !== 'undefined' &&
-    window.location.pathname !== '/sign-in'
+    window.location.pathname !== portalPagePath('/sign-in')
   ) {
-    window.location.replace('/sign-in')
+    window.location.replace(portalPagePath('/sign-in'))
   }
 }
 

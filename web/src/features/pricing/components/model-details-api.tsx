@@ -27,6 +27,7 @@ import {
 } from '@/components/ai-elements/code-block'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useStatus } from '@/hooks/use-status'
+import { portalApiOrigin, portalRuntime } from '@/lib/portal-runtime'
 
 import { replaceModelInPath } from '../lib/model-helpers'
 import type { PricingModel } from '../types'
@@ -432,6 +433,7 @@ function CodeSamplesSection(props: {
   const { status } = useStatus()
 
   const baseUrl = useMemo(() => {
+    if (portalRuntime().basePath) return portalApiOrigin()
     const candidate =
       (status as Record<string, unknown> | null)?.server_address ??
       (status as Record<string, unknown> | null)?.serverAddress ??

@@ -44,6 +44,7 @@ import {
 } from '@/components/ui/tooltip'
 import { useMediaQuery } from '@/hooks'
 import { useTableUrlState } from '@/hooks/use-table-url-state'
+import { portalLocalStorage } from '@/lib/portal-runtime'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
 import { getChannels, searchChannels, getGroups } from '../api'
@@ -125,7 +126,7 @@ export function ChannelsTable() {
         type: 'array',
         deserialize: (value) => {
           if (value !== undefined) return value
-          const stored = localStorage.getItem(
+          const stored = portalLocalStorage.getItem(
             CHANNELS_STATUS_FILTER_STORAGE_KEY
           )
           return stored === 'enabled' || stored === 'disabled' ? [stored] : []
@@ -145,7 +146,7 @@ export function ChannelsTable() {
       const status = next.find((f) => f.id === 'status')?.value as
         | string[]
         | undefined
-      localStorage.setItem(
+      portalLocalStorage.setItem(
         CHANNELS_STATUS_FILTER_STORAGE_KEY,
         status?.[0] ?? 'all'
       )

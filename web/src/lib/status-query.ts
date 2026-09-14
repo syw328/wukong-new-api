@@ -20,6 +20,7 @@ import { queryOptions, type QueryClient } from '@tanstack/react-query'
 
 import { getStatus } from '@/lib/api'
 import { DEFAULT_SYSTEM_NAME, DEFAULT_LOGO } from '@/lib/constants'
+import { portalLocalStorage } from '@/lib/portal-runtime'
 import {
   useSystemConfigStore,
   type CurrencyConfig,
@@ -107,7 +108,7 @@ export function mapStatusDataToConfig(
 export function readCachedStatus(): StatusData | null {
   try {
     if (typeof window === 'undefined') return null
-    const raw = window.localStorage.getItem(STATUS_STORAGE_KEY)
+    const raw = portalLocalStorage.getItem(STATUS_STORAGE_KEY)
     return raw ? (JSON.parse(raw) as StatusData) : null
   } catch {
     return null
@@ -118,7 +119,7 @@ export function readCachedStatus(): StatusData | null {
 function writeCachedStatus(status: StatusData | null): void {
   try {
     if (typeof window !== 'undefined' && status) {
-      window.localStorage.setItem(STATUS_STORAGE_KEY, JSON.stringify(status))
+      portalLocalStorage.setItem(STATUS_STORAGE_KEY, JSON.stringify(status))
     }
   } catch {
     /* Storage can be unavailable in private mode. */

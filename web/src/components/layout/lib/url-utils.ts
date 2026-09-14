@@ -18,6 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import type { LinkProps } from '@tanstack/react-router'
 
+import { portalInternalPath } from '@/lib/portal-runtime'
+
 import type { NavItem, NavCollapsible } from '../types'
 
 /**
@@ -59,6 +61,7 @@ export function checkIsActive(
   item: NavItem,
   mainNav = false
 ): boolean {
+  href = portalInternalPath(href)
   const hrefWithoutQuery = href.split('?')[0]
 
   if (item.activeUrls?.some((url) => urlToString(url) === hrefWithoutQuery)) {
@@ -87,8 +90,9 @@ export function checkIsActive(
         }
         return false
       })
-    )
+    ) {
       return true
+    }
   }
 
   // For regular link items, check the item's URL

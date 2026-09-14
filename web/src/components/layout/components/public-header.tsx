@@ -31,6 +31,7 @@ import { SystemUpdateAction } from '@/features/system-update/system-update-actio
 import { useNotifications } from '@/hooks/use-notifications'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { useTopNavLinks } from '@/hooks/use-top-nav-links'
+import { portalInternalPath } from '@/lib/portal-runtime'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -92,7 +93,7 @@ export function PublicHeader(props: PublicHeaderProps) {
   const dynamicLinks = useTopNavLinks()
   const notifications = useNotifications()
   const routerState = useRouterState()
-  const pathname = routerState.location.pathname
+  const pathname = portalInternalPath(routerState.location.pathname)
 
   const user = auth.user
   const isAuthenticated = !!user

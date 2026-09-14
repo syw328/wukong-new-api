@@ -20,6 +20,7 @@ import {
   buildAssertionResult,
   prepareCredentialRequestOptions,
 } from '@/lib/passkey'
+import { portalLocalStorage } from '@/lib/portal-runtime'
 import { AuthOperationError } from '@/lib/secure-verification'
 
 import type { PasskeyOptionsPayload } from './types'
@@ -39,7 +40,7 @@ export interface PasskeySelection {
 export function rememberPasskeyRPID(rpID?: string) {
   if (!rpID) return
   try {
-    localStorage.setItem(rememberedRPIDKey, rpID)
+    portalLocalStorage.setItem(rememberedRPIDKey, rpID)
   } catch {
     // Storage is optional; it never authorizes a credential or a domain.
   }
@@ -57,7 +58,7 @@ export async function requestPasskeyAssertion(
   signal?.throwIfAborted()
   let remembered: string | undefined
   try {
-    const value = localStorage.getItem(rememberedRPIDKey)
+    const value = portalLocalStorage.getItem(rememberedRPIDKey)
     if (value && value.length <= 253) remembered = value
   } catch {
     // Private browsing and blocked storage still support Passkey verification.
@@ -76,7 +77,7 @@ export async function requestPasskeyAssertion(
     }
     signal?.throwIfAborted()
     try {
-      localStorage.removeItem(rememberedRPIDKey)
+      portalLocalStorage.removeItem(rememberedRPIDKey)
     } catch {
       /* optional storage */
     }

@@ -56,6 +56,7 @@ import {
   ADMIN_PERMISSION_RESOURCES,
   hasPermission,
 } from '@/lib/admin-permissions'
+import { portalLocalStorage } from '@/lib/portal-runtime'
 import { useAuthStore } from '@/stores/auth-store'
 
 import {
@@ -91,12 +92,12 @@ export function ChannelsPrimaryButtons() {
   )
 
   const handleTagModeToggle = (checked: boolean) => {
-    localStorage.setItem('enable-tag-mode', String(checked))
+    portalLocalStorage.setItem('enable-tag-mode', String(checked))
     setEnableTagMode(checked)
   }
 
   const handleIdSortToggle = (checked: boolean) => {
-    localStorage.setItem('channels-id-sort', String(checked))
+    portalLocalStorage.setItem('channels-id-sort', String(checked))
     setIdSort(checked)
   }
 

@@ -24,6 +24,7 @@ import { wechatLoginByCode } from '@/features/auth/api'
 import { sanitizeAuthRedirect } from '@/features/auth/lib/auth-redirect'
 import { applyAuthBundle, isAuthBundle } from '@/lib/api'
 import { handleServerError } from '@/lib/handle-server-error'
+import { portalPagePath } from '@/lib/portal-runtime'
 import { AuthOperationError } from '@/lib/secure-verification'
 import { createServerError } from '@/lib/server-error-message'
 
@@ -46,7 +47,7 @@ function OAuthComponent() {
             const target =
               sanitizeAuthRedirect(search?.redirect, window.location.origin) ??
               '/dashboard'
-            navigate({ href: target, replace: true })
+            navigate({ href: portalPagePath(target), replace: true })
             return
           }
           throw createServerError(res, i18next.t('OAuth failed'))

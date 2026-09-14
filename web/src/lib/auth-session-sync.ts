@@ -1,3 +1,4 @@
+import { portalStorageKey, portalLocalStorage } from '@/lib/portal-runtime'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -24,7 +25,7 @@ export type AuthSessionSyncEvent = {
   timestamp: number
 }
 
-const AUTH_SYNC_CHANNEL = 'new-api:auth-session'
+const AUTH_SYNC_CHANNEL = portalStorageKey('new-api:auth-session')
 const AUTH_SYNC_STORAGE_KEY = 'new-api:auth-session:event'
 
 function randomIdentifier(): string {
@@ -70,8 +71,8 @@ export function publishAuthSessionEvent(
   }
 
   try {
-    window.localStorage.setItem(AUTH_SYNC_STORAGE_KEY, JSON.stringify(event))
-    window.localStorage.removeItem(AUTH_SYNC_STORAGE_KEY)
+    portalLocalStorage.setItem(AUTH_SYNC_STORAGE_KEY, JSON.stringify(event))
+    portalLocalStorage.removeItem(AUTH_SYNC_STORAGE_KEY)
   } catch {
     // Cross-tab synchronization is best-effort when storage is unavailable.
   }
@@ -105,7 +106,12 @@ export function subscribeAuthSessionEvents(
   }
 
   const handleStorage = (event: StorageEvent) => {
-    if (event.key !== AUTH_SYNC_STORAGE_KEY || !event.newValue) return
+    if (
+      event.key !== portalStorageKey(AUTH_SYNC_STORAGE_KEY) ||
+      !event.newValue
+    ) {
+      return
+    }
     try {
       deliver(JSON.parse(event.newValue))
     } catch {

@@ -1,3 +1,4 @@
+import { portalLocalStorage } from '@/lib/portal-runtime'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -30,13 +31,13 @@ export function initializeFrontendCache(): void {
   if (typeof window === 'undefined') return
 
   try {
-    const currentVersion = window.localStorage.getItem(
+    const currentVersion = portalLocalStorage.getItem(
       FRONTEND_CACHE_VERSION_KEY
     )
     if (currentVersion === FRONTEND_CACHE_VERSION) return
 
     clearLocalUiCache()
-    window.localStorage.setItem(
+    portalLocalStorage.setItem(
       FRONTEND_CACHE_VERSION_KEY,
       FRONTEND_CACHE_VERSION
     )
@@ -47,12 +48,12 @@ export function initializeFrontendCache(): void {
 
 function clearLocalUiCache(): void {
   const keysToRemove: string[] = []
-  for (let index = 0; index < window.localStorage.length; index += 1) {
-    const key = window.localStorage.key(index)
+  for (let index = 0; index < portalLocalStorage.length; index += 1) {
+    const key = portalLocalStorage.key(index)
     if (key && !PRESERVED_LOCAL_STORAGE_KEYS.has(key)) {
       keysToRemove.push(key)
     }
   }
 
-  keysToRemove.forEach((key) => window.localStorage.removeItem(key))
+  keysToRemove.forEach((key) => portalLocalStorage.removeItem(key))
 }

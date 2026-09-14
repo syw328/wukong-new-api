@@ -18,6 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useEffect, useState, useMemo } from 'react'
 
+import { portalLocalStorage } from '@/lib/portal-runtime'
+
 // Simple debounce implementation (no external dependencies)
 function debounce(
   fn: (value: string[]) => void,
@@ -49,7 +51,7 @@ export function useAccordionState(pageId: string) {
   // Initialize state from localStorage (immediate)
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(storageKey)
+      const stored = portalLocalStorage.getItem(storageKey)
       if (stored) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setOpenItems(JSON.parse(stored))
@@ -68,7 +70,7 @@ export function useAccordionState(pageId: string) {
     () =>
       debounce((value: string[]) => {
         try {
-          localStorage.setItem(storageKey, JSON.stringify(value))
+          portalLocalStorage.setItem(storageKey, JSON.stringify(value))
         } catch (_error) {
           // eslint-disable-next-line no-console
           console.error(

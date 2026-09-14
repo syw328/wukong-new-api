@@ -21,6 +21,7 @@ import axios from 'axios'
 import { t } from 'i18next'
 
 import { publishAuthSessionEvent } from '@/lib/auth-session-sync'
+import { portalRuntime, portalStorageKey } from '@/lib/portal-runtime'
 import { hasSessionHint } from '@/lib/session-hint'
 import {
   useAuthStore,
@@ -68,7 +69,7 @@ export class AuthRotationError extends Error {
 }
 
 const authClient = axios.create({
-  baseURL: '',
+  baseURL: portalRuntime().transportPath,
   withCredentials: true,
   headers: {
     // no-store forbids storage; no-cache also revalidates any older cached response.
@@ -322,7 +323,7 @@ async function performRefreshWithBrowserLock(
       return runRefresh(refreshEpoch)
     }
     return navigator.locks.request(
-      'new-api:auth-refresh',
+      portalStorageKey('new-api:auth-refresh'),
       { mode: 'exclusive' },
       () => runRefresh(refreshEpoch)
     )

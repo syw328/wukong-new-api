@@ -23,6 +23,8 @@ import type {
 } from '@tanstack/react-table'
 import { useEffect, useMemo, useState } from 'react'
 
+import { portalLocalStorage } from '@/lib/portal-runtime'
+
 type SearchRecord = Record<string, unknown>
 
 // Page size persists globally under the established storage key (raw number
@@ -31,7 +33,10 @@ const PAGE_SIZE_STORAGE_KEY = 'page-size'
 
 function getStoredPageSize(): number | undefined {
   try {
-    const n = parseInt(localStorage.getItem(PAGE_SIZE_STORAGE_KEY) ?? '', 10)
+    const n = Number.parseInt(
+      portalLocalStorage.getItem(PAGE_SIZE_STORAGE_KEY) ?? '',
+      10
+    )
     return n > 0 ? n : undefined // n > 0 also rejects NaN
   } catch {
     return undefined
@@ -40,7 +45,7 @@ function getStoredPageSize(): number | undefined {
 
 function setStoredPageSize(size: number) {
   try {
-    localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(size))
+    portalLocalStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(size))
   } catch {
     /* ignore */
   }
@@ -222,7 +227,7 @@ export function useTableUrlState(
           value.trim() !== '' ? serialize(value) : undefined
       } else {
         const value = Array.isArray(found?.value)
-          ? (found!.value as unknown[])
+          ? (found?.value as unknown[])
           : []
         patch[cfg.searchKey] = value.length > 0 ? serialize(value) : undefined
       }

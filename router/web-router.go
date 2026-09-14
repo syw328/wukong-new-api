@@ -1,8 +1,10 @@
 package router
 
 import (
+	"bytes"
 	"embed"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -21,6 +23,7 @@ type WebAssets struct {
 
 func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.HandlerFunc) {
 	frontendFS := common.EmbedFolder(assets.BuildFS, "web/dist")
+	serveStatic := static.Serve("/", frontendFS)
 
 	router.NoRoute(
 		pluginDispatcher,
@@ -29,14 +32,50 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 		middleware.AccessTokenAudit(),
 		middleware.GlobalWebRateLimit(),
 		middleware.Cache(),
-		static.Serve("/", frontendFS),
+		func(c *gin.Context) {
+			if c.Request.URL.Path != "/" && c.Request.URL.Path != "/index.html" {
+				serveStatic(c)
+			}
+		},
 		func(c *gin.Context) {
 			if strings.HasPrefix(c.Request.RequestURI, "/v1") || strings.HasPrefix(c.Request.RequestURI, "/api") || strings.HasPrefix(c.Request.RequestURI, "/assets") {
 				controller.RelayNotFound(c)
 				return
 			}
-			c.Header("Cache-Control", "no-cache")
-			c.Data(http.StatusOK, "text/html; charset=utf-8", assets.IndexPage)
+			portal, mounted := common.PlatformPortalForRequest(c.Request)
+			legacyOrigin := os.Getenv("PLATFORM_LEGACY_PORTAL_ORIGIN")
+			primaryOrigin := os.Getenv("PLATFORM_PUBLIC_ORIGIN")
+			if !mounted && legacyOrigin == "https://"+c.Request.Host && primaryOrigin != "" && !strings.HasPrefix(c.Request.URL.Path, "/oauth/") {
+				target := c.Request.URL.RequestURI()
+				root := strings.Split(strings.TrimPrefix(c.Request.URL.Path, "/"), "/")[0]
+				switch root {
+				case "channels", "chat", "chat2link", "dashboard", "errors", "keys", "models", "playground", "profile", "redemption-codes", "security", "subscriptions", "system-info", "system-settings", "task-plugins", "usage-logs", "users", "wallet":
+					target = "/console" + target
+				}
+				c.Redirect(http.StatusFound, primaryOrigin+"/api"+target)
+				return
+			}
+			prefix := "/"
+			page := bytes.Clone(assets.IndexPage)
+			if mounted {
+				prefix = portal.TransportPath + "/"
+				runtime, err := common.Marshal(portal)
+				if err != nil {
+					c.AbortWithStatus(http.StatusInternalServerError)
+					return
+				}
+				// JSON data is not executable. Escape HTML delimiters even with alternate JSON codecs.
+				runtime = bytes.ReplaceAll(runtime, []byte("<"), []byte(`\u003c`))
+				runtime = bytes.ReplaceAll(runtime, []byte(">"), []byte(`\u003e`))
+				page = bytes.Replace(page, []byte("<head>"), append([]byte(`<head><script type="application/json" id="platform-portal-runtime">`), append(runtime, []byte("</script>")...)...), 1)
+			}
+			for _, attribute := range []string{`src="static/`, `href="static/`, `src="/static/`, `href="/static/`} {
+				kind, _, _ := strings.Cut(attribute, "=")
+				page = bytes.ReplaceAll(page, []byte(attribute), []byte(kind+`="`+prefix+"static/"))
+			}
+			page = bytes.ReplaceAll(page, []byte(`href="/logo.png"`), []byte(`href="`+prefix+`logo.png"`))
+			c.Header("Cache-Control", "no-store")
+			c.Data(http.StatusOK, "text/html; charset=utf-8", page)
 		},
 	)
 }

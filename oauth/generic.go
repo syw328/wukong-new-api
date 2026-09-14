@@ -93,6 +93,11 @@ func (p *GenericOAuthProvider) ExchangeToken(ctx context.Context, code string, c
 	}
 
 	redirectUri := fmt.Sprintf("%s/oauth/%s", system_setting.ServerAddress, p.config.Slug)
+	tokenEndpoint := p.config.TokenEndpoint
+	if portal, ok := common.PlatformPortalForRequest(c.Request); ok && p.config.Slug == "platform" {
+		redirectUri = portal.Origin + portal.BasePath + "/oauth/platform"
+		tokenEndpoint = portal.Origin + "/api/oauth/token"
+	}
 	values := url.Values{}
 	values.Set("grant_type", "authorization_code")
 	values.Set("code", code)
@@ -113,7 +118,7 @@ func (p *GenericOAuthProvider) ExchangeToken(ctx context.Context, code string, c
 		values.Set("client_secret", p.config.ClientSecret)
 	}
 
-	req, err = http.NewRequestWithContext(ctx, "POST", p.config.TokenEndpoint, strings.NewReader(values.Encode()))
+	req, err = http.NewRequestWithContext(ctx, "POST", tokenEndpoint, strings.NewReader(values.Encode()))
 	if err != nil {
 		return nil, err
 	}

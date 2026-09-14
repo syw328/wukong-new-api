@@ -24,6 +24,8 @@ import {
   type StateStorage,
 } from 'zustand/middleware'
 
+import { portalLocalStorage } from '@/lib/portal-runtime'
+
 import { systemReleaseSchema } from './releases'
 
 const updateSnapshotSchema = z
@@ -50,21 +52,21 @@ interface SystemUpdateStore {
 const updateStorage: StateStorage = {
   getItem: (key) => {
     try {
-      return localStorage.getItem(key)
+      return portalLocalStorage.getItem(key)
     } catch {
       return null
     }
   },
   setItem: (key, value) => {
     try {
-      localStorage.setItem(key, value)
+      portalLocalStorage.setItem(key, value)
     } catch {
       /* In-memory state remains usable. */
     }
   },
   removeItem: (key) => {
     try {
-      localStorage.removeItem(key)
+      portalLocalStorage.removeItem(key)
     } catch {
       /* Storage can be unavailable. */
     }

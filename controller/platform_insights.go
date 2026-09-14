@@ -22,6 +22,9 @@ func proxyPlatformInsights(c *gin.Context, resource string) bool {
 	common.OptionMapRWMutex.RLock()
 	base := strings.TrimRight(common.OptionMap["PlatformPublicBaseURL"], "/")
 	common.OptionMapRWMutex.RUnlock()
+	if portal, ok := common.PlatformPortalForRequest(c.Request); ok {
+		base = portal.Origin
+	}
 	if base == "" {
 		return false
 	}

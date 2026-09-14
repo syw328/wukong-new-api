@@ -55,6 +55,7 @@ import {
 import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 import { splitPluginBillingExprKey } from '@/features/pricing/lib/plugin-pricing'
 import { useMediaQuery } from '@/hooks'
+import { portalLocalStorage } from '@/lib/portal-runtime'
 
 import { safeJsonParse } from '../utils/json-parser'
 import type { PricingMode } from './model-pricing-core'
@@ -169,7 +170,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
   })
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
     () => {
-      const saved = localStorage.getItem(STORAGE_KEY)
+      const saved = portalLocalStorage.getItem(STORAGE_KEY)
       if (saved) {
         try {
           return safeJsonParse<VisibilityState>(saved, {
@@ -203,7 +204,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
   )
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(columnVisibility))
+    portalLocalStorage.setItem(STORAGE_KEY, JSON.stringify(columnVisibility))
   }, [columnVisibility])
 
   const taskModelNames = useMemo(

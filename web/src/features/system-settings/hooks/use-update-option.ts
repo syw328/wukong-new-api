@@ -21,6 +21,7 @@ import i18next from 'i18next'
 import { toast } from 'sonner'
 
 import { handleServerError } from '@/lib/handle-server-error'
+import { portalLocalStorage } from '@/lib/portal-runtime'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
 import { updatePasskeyDomains, updateSystemOption } from '../api'
@@ -62,7 +63,7 @@ export function useUpdateOption() {
         if (STATUS_RELATED_KEYS.has(variables.key)) {
           queryClient.invalidateQueries({ queryKey: ['status'] })
           try {
-            window.localStorage.removeItem('status')
+            portalLocalStorage.removeItem('status')
           } catch {
             /* empty */
           }
@@ -97,7 +98,7 @@ export function useUpdatePasskeyDomains() {
       queryClient.invalidateQueries({ queryKey: ['system-options'] })
       queryClient.invalidateQueries({ queryKey: ['status'] })
       try {
-        window.localStorage.removeItem('status')
+        portalLocalStorage.removeItem('status')
       } catch {
         /* Storage may be disabled. */
       }

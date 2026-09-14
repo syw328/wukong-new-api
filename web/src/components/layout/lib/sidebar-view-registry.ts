@@ -16,7 +16,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { type TFunction } from 'i18next'
+import type { TFunction } from 'i18next'
+
+import { portalInternalPath } from '@/lib/portal-runtime'
 
 import { SYSTEM_SETTINGS_VIEW } from '../config/system-settings.config'
 import type { NavGroup, SidebarView } from '../types'
@@ -39,7 +41,11 @@ const SIDEBAR_VIEWS: readonly SidebarView[] = [SYSTEM_SETTINGS_VIEW]
  *          navigation should be displayed.
  */
 export function resolveSidebarView(pathname: string): SidebarView | null {
-  return SIDEBAR_VIEWS.find((view) => view.pathPattern.test(pathname)) ?? null
+  return (
+    SIDEBAR_VIEWS.find((view) =>
+      view.pathPattern.test(portalInternalPath(pathname))
+    ) ?? null
+  )
 }
 
 /**

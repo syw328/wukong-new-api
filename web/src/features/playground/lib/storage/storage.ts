@@ -1,3 +1,5 @@
+import { portalLocalStorage } from '@/lib/portal-runtime'
+
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -47,18 +49,18 @@ const MIN_REPEATED_SECTION_COUNT = 3
 const SECTION_HEADING_LINE_PATTERN = /^#{2,6}\s+\d+\.\s+.+$/gm
 
 function readStoredValue(key: string): unknown | null {
-  const saved = localStorage.getItem(key)
+  const saved = portalLocalStorage.getItem(key)
   if (!saved) return null
 
   return JSON.parse(saved) as unknown
 }
 
 function readStoredMessagesValue(): unknown | null {
-  const saved = localStorage.getItem(STORAGE_KEYS.MESSAGES)
+  const saved = portalLocalStorage.getItem(STORAGE_KEYS.MESSAGES)
   if (!saved) return null
 
   if (saved.length > MAX_STORED_MESSAGES_BYTES) {
-    localStorage.removeItem(STORAGE_KEYS.MESSAGES)
+    portalLocalStorage.removeItem(STORAGE_KEYS.MESSAGES)
     return null
   }
 
@@ -83,7 +85,7 @@ function writeStoredValue<T>(key: string, data: T): void {
     data,
   }
 
-  localStorage.setItem(key, JSON.stringify(payload))
+  portalLocalStorage.setItem(key, JSON.stringify(payload))
 }
 
 function trimMessages(messages: Message[]): Message[] {
@@ -388,9 +390,9 @@ export function saveMessages(messages: Message[]): void {
  */
 export function clearPlaygroundData(): void {
   try {
-    localStorage.removeItem(STORAGE_KEYS.CONFIG)
-    localStorage.removeItem(STORAGE_KEYS.PARAMETER_ENABLED)
-    localStorage.removeItem(STORAGE_KEYS.MESSAGES)
+    portalLocalStorage.removeItem(STORAGE_KEYS.CONFIG)
+    portalLocalStorage.removeItem(STORAGE_KEYS.PARAMETER_ENABLED)
+    portalLocalStorage.removeItem(STORAGE_KEYS.MESSAGES)
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Failed to clear playground data:', error)

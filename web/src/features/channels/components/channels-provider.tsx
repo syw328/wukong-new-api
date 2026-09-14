@@ -26,6 +26,8 @@ import React, {
   useMemo,
 } from 'react'
 
+import { portalLocalStorage } from '@/lib/portal-runtime'
+
 import { useChannelUpstreamUpdates } from '../hooks/use-channel-upstream-updates'
 import { channelsQueryKeys } from '../lib'
 import type { Channel } from '../types'
@@ -84,10 +86,10 @@ export function ChannelsProvider({ children }: { children: React.ReactNode }) {
   const [currentRow, setCurrentRow] = useState<Channel | null>(null)
   const [currentTag, setCurrentTag] = useState<string | null>(null)
   const [enableTagMode, setEnableTagMode] = useState(() => {
-    return localStorage.getItem('enable-tag-mode') === 'true'
+    return portalLocalStorage.getItem('enable-tag-mode') === 'true'
   })
   const [idSort, setIdSort] = useState(() => {
-    return localStorage.getItem('channels-id-sort') === 'true'
+    return portalLocalStorage.getItem('channels-id-sort') === 'true'
   })
   const [batchMode, setBatchMode] = useState(false)
   const [sensitiveVisible, setSensitiveVisible] = useState(true)

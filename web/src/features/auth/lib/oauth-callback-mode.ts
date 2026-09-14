@@ -1,3 +1,4 @@
+import { portalSessionStorage } from '@/lib/portal-runtime'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -25,7 +26,7 @@ export function rememberOAuthLoginRedirect(
 ): void {
   if (!redirect) return
   try {
-    window.sessionStorage.setItem(`oauth_login_redirect:${state}`, redirect)
+    portalSessionStorage.setItem(`oauth_login_redirect:${state}`, redirect)
   } catch {
     // Login can still complete using the default destination.
   }
@@ -34,8 +35,8 @@ export function rememberOAuthLoginRedirect(
 export function consumeOAuthLoginRedirect(state: string): string | null {
   try {
     const key = `oauth_login_redirect:${state}`
-    const redirect = window.sessionStorage.getItem(key)
-    window.sessionStorage.removeItem(key)
+    const redirect = portalSessionStorage.getItem(key)
+    portalSessionStorage.removeItem(key)
     return redirect
   } catch {
     return null

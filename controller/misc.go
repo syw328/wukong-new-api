@@ -167,6 +167,14 @@ func GetStatus(c *gin.Context) {
 		data["custom_oauth_providers"] = providersInfo
 	}
 
+	if portal, ok := common.PlatformPortalForRequest(c.Request); ok {
+		data["server_address"] = portal.Origin + portal.TransportPath
+		if portal.BrandName != "" {
+			data["system_name"] = portal.BrandName + " API 开放平台"
+		}
+		data["logo"] = portal.Logo
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",

@@ -18,6 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import * as React from 'react'
 
+import { portalLocalStorage } from '@/lib/portal-runtime'
+
 export const DATA_TABLE_VIEW_MODES = {
   TABLE: 'table',
   CARD: 'card',
@@ -42,7 +44,7 @@ function readViewMode(
   }
 
   try {
-    const raw = window.localStorage.getItem(storageKey)
+    const raw = portalLocalStorage.getItem(storageKey)
     return isViewMode(raw) ? raw : fallback
   } catch {
     return fallback
@@ -91,7 +93,7 @@ export function useDataTableViewMode(
         return
       }
       try {
-        window.localStorage.setItem(storageKey, mode)
+        portalLocalStorage.setItem(storageKey, mode)
       } catch {
         // Storage can be unavailable in private mode; controls still work.
       }
