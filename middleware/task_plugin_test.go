@@ -1783,3 +1783,29 @@ func TestPlatformMediaIdempotencyPersistsAcrossPollAndRejectsConflicts(t *testin
 	assert.Equal(t, 1, created)
 	assert.Empty(t, platformMediaLocks.entries)
 }
+
+func TestPlatformMediaNamespaceKeepsPublicModelAndRejectsUnpublishedModels(t *testing.T) {
+	source, err := builtinplugins.Source("platform-media")
+	require.NoError(t, err)
+	source = strings.Replace(source, `const PLATFORM_MODELS = ["__platform_media__"];`, `const PLATFORM_MODELS = ["minimax-h3","image-test"];`, 1)
+	plugin := compileTaskRoutePlugin(t, source)
+	for _, name := range []string{"minimax-h3", "image-test", "not-published"} {
+		router := gin.New()
+		router.POST("/v1/media/generations", pinTaskPluginRoute(plugin, 0), PrepareTaskPluginRoute(), func(c *gin.Context) {
+			assert.Equal(t, name, c.GetString("resolved_task_model"))
+			request, exists := c.Get("task_request")
+			require.True(t, exists)
+			assert.Equal(t, name, request.(map[string]any)["model"])
+			c.Status(http.StatusNoContent)
+		})
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/v1/media/generations", strings.NewReader(`{"model":"`+name+`","prompt":"test","params":{}}`))
+		request.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(response, request)
+		if name == "not-published" {
+			assert.Equal(t, http.StatusBadRequest, response.Code)
+		} else {
+			assert.Equal(t, http.StatusNoContent, response.Code, response.Body.String())
+		}
+	}
+}

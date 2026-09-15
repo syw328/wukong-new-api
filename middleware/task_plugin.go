@@ -214,6 +214,17 @@ func PrepareTaskPluginRoute() gin.HandlerFunc {
 				abortTaskPluginRouteErrorDetail(c, http.StatusBadRequest, fmt.Sprintf("model %q is not allowed on this route", modelName))
 				return
 			}
+			// Both the manifest model and original request must name the same
+			// platform model before the public ID reaches channel selection.
+			if pinned.Plugin.Meta.Key == "platform-media" {
+				publicName, valid := strings.CutPrefix(modelName, "platform-media:")
+				payload, bodyOK := resolved["requestBody"].(map[string]any)
+				if !valid || !bodyOK || payload["model"] != publicName {
+					abortTaskPluginRouteErrorDetail(c, http.StatusBadRequest, "invalid platform media model binding")
+					return
+				}
+				modelName = publicName
+			}
 			action := pinned.Route.Action
 			if resolvedAction, present := resolved["action"]; present {
 				actionValue, actionOK := resolvedAction.(string)
@@ -1420,7 +1431,15 @@ func PrepareTaskPluginSubmit() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": "model is required", "type": "invalid_request_error"}})
 			return
 		}
-		exactOwned := slices.Contains(plugin.Meta.Models, modelName)
+		declaredModel := modelName
+		if pluginKey == "platform-media" {
+			declaredModel = "platform-media:" + modelName
+		}
+		exactOwned := slices.Contains(plugin.Meta.Models, declaredModel)
+		if pluginKey == "platform-media" && !exactOwned {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": gin.H{"message": "model is not available in this platform", "type": "invalid_request_error"}})
+			return
+		}
 		exactAlias := false
 		if target, resolved := model.ResolveTaskModelAlias(generation, modelName); resolved && target.Alias == modelName && target.PluginKey == plugin.Meta.Key {
 			exactAlias = true

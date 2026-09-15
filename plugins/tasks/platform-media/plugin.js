@@ -7,7 +7,7 @@ export const meta = {
   apiVersion: 1, key: "platform-media", name: "Platform media", version: PLATFORM_VERSION,
   author: { name: "Platform contributors" },
   description: { en: "Platform images, video and audio with confirmed account pricing", zh: "平台图片、视频与音频，按账号确认价格生成" },
-  models: PLATFORM_MODELS, auth: { type: "api_key" }, fetchMode: "per_task",
+  models: PLATFORM_MODELS.map((name) => "platform-media:" + name), auth: { type: "api_key" }, fetchMode: "per_task",
   usageSchema: {
     platform_credits: { type: "number", unit: "credit", description: { en: "Platform generation credit unit price", zh: "平台生成算力单价" } },
   },
@@ -20,10 +20,11 @@ export const meta = {
 function bodyOf(value) { return typeof value === "string" ? JSON.parse(value) : value; }
 function request(ctx) {
   const input = ctx.requestBody || {};
-  if (!input.model || !PLATFORM_MODELS.includes(input.model)) throw new Error("model_not_available");
+  const model = typeof input.model === "string" ? input.model.replace(/^platform-media:/, "") : "";
+  if (!PLATFORM_MODELS.includes(model)) throw new Error("model_not_available");
   if (typeof input.authorization_max !== "number" || !Number.isFinite(input.authorization_max) || input.authorization_max <= 0 || input.authorization_max > 1000000) throw new Error("confirmed_quote_required");
   if (typeof input.authorization_token !== "string" || input.authorization_token.length > 3000 || !input.confirmed_price_book_id) throw new Error("confirmed_quote_required");
-  return { model: input.model, prompt: input.prompt || "", params: input.params || {},
+  return { model: model, prompt: input.prompt || "", params: input.params || {},
     authorization_token: input.authorization_token, authorization_max: input.authorization_max,
     confirmed_price_book_id: input.confirmed_price_book_id };
 }
@@ -91,7 +92,8 @@ function renderTask(ctx, task) {
 export const native = {
   decodeSubmit: function(ctx) {
     if (!ctx.body || ctx.body.kind !== "json" || !ctx.body.value) throw new Error("json_body_required");
-    return { kind: "submit", model: ctx.body.value.model, action: "GENERATE", requestBody: ctx.body.value };
+    if (!PLATFORM_MODELS.includes(ctx.body.value.model)) throw new Error("model_not_available");
+    return { kind: "submit", model: "platform-media:" + ctx.body.value.model, action: "GENERATE", requestBody: ctx.body.value };
   },
   renderTask: renderTask,
   error: function(ctx, err) { return { error: { code: err.code, message: err.message } }; },

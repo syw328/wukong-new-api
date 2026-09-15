@@ -33,7 +33,7 @@ func TestPlatformMediaNativeProtocol(t *testing.T) {
 	request := map[string]any{"model": "image-test", "prompt": "test", "params": map[string]any{"resolution": "2K"}, "authorization_max": 0.4, "authorization_token": "signed-test-token", "confirmed_price_book_id": "book"}
 	ctx := map[string]any{"baseUrl": "https://platform.test", "authHeader": "Bearer test-only-key", "publicTaskId": "task_client", "platformRequestFingerprint": "fingerprint", "requestBody": request}
 	t.Run("all three modalities share exact platform protocol, not fabricated OpenAI image semantics", func(t *testing.T) {
-		assert.ElementsMatch(t, []string{"image-test", "video-test", "audio-test"}, plugin.Meta.Models)
+		assert.ElementsMatch(t, []string{"platform-media:image-test", "platform-media:video-test", "platform-media:audio-test"}, plugin.Meta.Models)
 		require.Len(t, plugin.Meta.Routes, 2)
 		submit := invoke("buildSubmitRequest", ctx)
 		assert.Equal(t, "https://platform.test/v1/media/generations", submit["url"])
@@ -75,4 +75,15 @@ func TestPlatformMediaNativeProtocol(t *testing.T) {
 		failed := map[string]any{"id": "act_1", "status": "failed", "billing": map[string]any{"state": "settled", "charged": 0}}
 		assert.Equal(t, "FAILURE", invoke("parseTaskResult", map[string]any{"taskId": "act_1"}, failed)["status"])
 	})
+}
+
+func TestPlatformMediaCoexistsWithFactoryModelCaseVariants(t *testing.T) {
+	source, err := builtinplugins.Source("platform-media")
+	require.NoError(t, err)
+	source = strings.Replace(source, `const PLATFORM_MODELS = ["__platform_media__"];`, `const PLATFORM_MODELS = ["minimax-h3","gpt-image-2"];`, 1)
+	plugin, err := jsplugin.NewRegistry().Register(source, jsplugin.Options{})
+	require.NoError(t, err)
+	require.NoError(t, jsplugin.ValidateV1Meta(plugin.Meta))
+	require.NoError(t, jsplugin.PreflightRoutingConflict(jsplugin.DefaultRegistry.Generation(), plugin))
+	assert.Contains(t, plugin.Meta.Models, "platform-media:minimax-h3")
 }
