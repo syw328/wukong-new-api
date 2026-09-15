@@ -6,7 +6,12 @@ import { portalRuntime } from '@/lib/portal-runtime'
 import { requireServerSuccess } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
-import type { PlatformModel, PriceDetails, PriceSelections } from './types'
+import type {
+  PlatformModel,
+  PriceDetails,
+  PriceSelections,
+  MarketSummaries,
+} from './types'
 
 export function usePlatformModels() {
   const userId = useAuthStore((state) => state.auth.user?.id ?? 'anonymous')
@@ -42,6 +47,29 @@ export function usePlatformPrices(model: string, selections: PriceSelections) {
       return requireServerSuccess(result.data).data
     },
     enabled: Boolean(model),
+    staleTime: 20_000,
+    refetchInterval: 60_000,
+    retry: false,
+  })
+}
+
+export function usePlatformSummaries(models: string[]) {
+  const userId = useAuthStore((state) => state.auth.user?.id ?? 'anonymous')
+  return useQuery({
+    queryKey: [
+      'platform-market-summary',
+      portalRuntime().origin,
+      userId,
+      models,
+    ],
+    queryFn: async ({ signal }) => {
+      const result = await api.post<{
+        success: boolean
+        data: MarketSummaries
+      }>('/api/platform-model-prices', { models }, { signal })
+      return requireServerSuccess(result.data).data
+    },
+    enabled: models.length > 0,
     staleTime: 20_000,
     refetchInterval: 60_000,
     retry: false,

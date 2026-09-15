@@ -127,7 +127,7 @@ function FilterChip(props: {
   )
 }
 
-function FilterSection(props: FilterSectionProps) {
+export function FilterSection(props: FilterSectionProps) {
   return (
     <Collapsible
       defaultOpen

@@ -1,205 +1,337 @@
 // Copyright (C) 2026 QuantumNous and contributors. AGPL-3.0-or-later.
 import {
-  ArrowLeft,
-  ChevronRight,
-  Coins,
-  Image,
-  MessageSquare,
-  Music,
+  ArrowDownWideNarrow,
+  Boxes,
+  Code2,
+  LayoutGrid,
+  List,
   Search,
-  Video,
+  SlidersHorizontal,
+  Sparkles,
+  X,
 } from 'lucide-react'
-import { useDeferredValue, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { CopyButton } from '@/components/copy-button'
-import { Dialog } from '@/components/dialog'
+import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { PublicLayout } from '@/components/layout'
 import { Footer } from '@/components/layout/components/footer'
 import { LoadingState } from '@/components/loading-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { getLobeIcon } from '@/lib/lobe-icon'
-import { useAuthStore } from '@/stores/auth-store'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
-import { usePlatformModels } from './api'
-import { filterPlatformModels } from './helpers'
-import { ModelApi } from './model-api'
-import { ModelPrices } from './model-prices'
-import { TYPE_LABELS, type ModelType, type PlatformModel } from './types'
+import { usePlatformModels, usePlatformSummaries } from './api'
+import { BILLING_LABELS, DEFAULT_FILTERS } from './constants'
+import { filterPlatformModels, sortMarketModels } from './helpers'
+import { MarketCard } from './market-card'
+import { MarketFilters } from './market-filters'
+import { ModelDetailsDialog } from './model-details-dialog'
+import {
+  TYPE_LABELS,
+  type MarketFiltersValue,
+  type MarketSort,
+  type ModelSummary,
+  type PlatformModel,
+} from './types'
+
+import '@/styles/platform-market.css'
 
 const EMPTY_MODELS: PlatformModel[] = []
-const ICONS = { chat: MessageSquare, image: Image, video: Video, audio: Music }
+const EMPTY_SUMMARIES: Record<string, ModelSummary> = {}
+const SORT_LABELS: Record<MarketSort, string> = {
+  default: 'Recommended order',
+  name: 'Model name',
+  price: 'Price: low to high (same unit)',
+  success: 'Success rate: high to low',
+  routes: 'Route count: high to low',
+}
 
-function ModelHeading(props: { model: PlatformModel }) {
-  const { t } = useTranslation()
-  const Icon = ICONS[props.model.type]
-  return (
-    <div className='flex min-w-0 items-center gap-4'>
-      <div className='bg-muted grid size-14 shrink-0 place-items-center rounded-2xl'>
-        {props.model.icon ? (
-          getLobeIcon(props.model.icon, 32)
-        ) : (
-          <Icon className='size-7' />
-        )}
-      </div>
-      <div className='min-w-0 space-y-1'>
-        <span className='text-muted-foreground text-xs'>
-          {t(TYPE_LABELS[props.model.type])}
-        </span>
-        <h2 className='text-2xl font-semibold tracking-tight break-words'>
-          {props.model.name}
-        </h2>
-        <div className='flex items-center gap-1'>
-          <code className='text-muted-foreground text-xs break-all'>
-            {props.model.id}
-          </code>
-          <CopyButton value={props.model.id} size='sm' />
-        </div>
-      </div>
-    </div>
-  )
-}
-function ModelDetailsBody(props: {
-  model: PlatformModel
-  pricesOnly?: boolean
-}) {
-  const { t } = useTranslation()
-  const userId = useAuthStore((state) => state.auth.user?.id ?? 'anonymous')
-  return (
-    <div className='space-y-6'>
-      <ModelHeading model={props.model} />
-      <p className='text-muted-foreground text-sm leading-relaxed'>
-        {props.model.description}
-      </p>
-      {!props.model.available && (
-        <p
-          role='status'
-          className='text-muted-foreground rounded-xl border p-4 text-sm'
-        >
-          {t(
-            'This model is currently unavailable on this site. It cannot be submitted until a route is available.'
-          )}
-        </p>
-      )}
-      <Tabs defaultValue={props.pricesOnly ? 'prices' : 'api'}>
-        <TabsList>
-          <TabsTrigger value='prices'>{t('Price details')}</TabsTrigger>
-          <TabsTrigger value='api'>{t('API connection')}</TabsTrigger>
-        </TabsList>
-        <TabsContent value='prices' className='pt-4'>
-          <ModelPrices
-            key={`${props.model.id}:${userId}`}
-            model={props.model.id}
-          />
-        </TabsContent>
-        <TabsContent value='api' className='pt-4'>
-          <ModelApi model={props.model} />
-        </TabsContent>
-      </Tabs>
-    </div>
-  )
-}
 export function PlatformModelsPage(props: {
   mode?: 'catalog' | 'prices'
   initialModel?: string
 }) {
   const { t } = useTranslation()
+  const prices = props.mode === 'prices'
   const query = usePlatformModels()
+  const models = query.data || EMPTY_MODELS
+  const modelIds = useMemo(() => models.map((model) => model.id), [models])
+  const summaryQuery = usePlatformSummaries(modelIds)
   const [search, setSearch] = useState('')
-  const [category, setCategory] = useState<ModelType | 'all'>('all')
+  const deferredSearch = useDeferredValue(search)
+  const [filters, setFilters] = useState<MarketFiltersValue>(DEFAULT_FILTERS)
+  const [sort, setSort] = useState<MarketSort>('default')
+  const [view, setView] = useState<'grid' | 'list'>(prices ? 'list' : 'grid')
+  const [mobileFilters, setMobileFilters] = useState(false)
   const [selectedId, setSelectedId] = useState(props.initialModel || '')
   const [limit, setLimit] = useState(24)
-  const deferredSearch = useDeferredValue(search)
-  const models = query.data || EMPTY_MODELS
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
+  const summaries = useMemo(() => {
+    if (summaryQuery.isError || !summaryQuery.data) return EMPTY_SUMMARIES
+    const data = summaryQuery.data
+    if (data.pricesAvailable && Date.parse(data.validUntil) > now) {
+      return data.summaries
+    }
+    return Object.fromEntries(
+      Object.entries(data.summaries).map(([id, summary]) => [
+        id,
+        { ...summary, startingPrice: null },
+      ])
+    )
+  }, [summaryQuery.data, summaryQuery.isError, now])
   const filtered = useMemo(
-    () => filterPlatformModels(models, category, deferredSearch),
-    [models, category, deferredSearch]
+    () =>
+      sortMarketModels(
+        filterPlatformModels(
+          models,
+          filters.category,
+          deferredSearch,
+          filters,
+          summaries
+        ),
+        sort,
+        summaries
+      ),
+    [models, filters, deferredSearch, sort, summaries]
   )
   const selected = models.find((model) => model.id === selectedId)
-  const prices = props.mode === 'prices'
+  const vendorCount = new Set(models.map((model) => model.vendor || 'Other'))
+    .size
+  const activeFilters = Object.entries(filters).filter(
+    ([, value]) => value !== 'all'
+  ) as Array<[keyof MarketFiltersValue, string]>
+  function resetFilters() {
+    setFilters(DEFAULT_FILTERS)
+    setSearch('')
+    setLimit(24)
+  }
+  function updateFilters(value: MarketFiltersValue) {
+    setFilters(value)
+    setLimit(24)
+  }
   return (
-    <PublicLayout>
-      <div className='mx-auto max-w-7xl space-y-8 pt-6 pb-12 md:pt-10'>
-        <header className='flex flex-wrap items-end justify-between gap-5'>
-          <div className='max-w-2xl space-y-3'>
-            <div className='text-muted-foreground flex items-center gap-2 text-xs font-medium tracking-widest uppercase'>
-              <Coins className='size-4' />
-              {t('Platform model catalog')}
+    <PublicLayout showMainContainer={false}>
+      <main
+        className={`market-page ${prices ? 'market-prices-page' : 'market-catalog-page'}`}
+      >
+        <header className='market-hero'>
+          <div className='market-hero-content'>
+            <div className='market-eyebrow'>
+              <span className='market-status-dot' />
+              <span>{t('A universe of models. One API.')}</span>
             </div>
-            <h1 className='text-3xl font-semibold tracking-tight md:text-4xl'>
+            <h1>
               {t(prices ? 'Model Prices' : 'Model Square')}
+              <span className='market-title-dot'>.</span>
             </h1>
-            <p className='text-muted-foreground text-sm leading-6'>
+            <p className='market-hero-description'>
               {t(
                 prices
-                  ? 'Compare current prices by model, route and specification. Your account and this site determine the applicable price.'
-                  : 'Every language, image, video and audio model published on this site, with its actual API protocol and parameters.'
+                  ? 'Every route, clearly priced. Compare starting prices, billing methods and reliability before you connect.'
+                  : 'Find your next creative engine. Explore language, images, video and audio in one place.'
               )}
             </p>
+            <div className='market-hero-stats'>
+              <span>
+                <b>{models.length}</b> {t('Models available')}
+              </span>
+              <span className='market-stat-divider' />
+              <span>
+                <b>{vendorCount}</b> {t('Manufacturers')}
+              </span>
+              <span className='market-stat-divider' />
+              <span>
+                <Code2 className='size-4' aria-hidden />
+                {t('Unified API access')}
+              </span>
+            </div>
           </div>
-          <Badge variant='secondary' className='px-3 py-2'>
-            {t('{{count}} models', { count: models.length })}
-          </Badge>
-        </header>
-        {prices && selected ? (
-          <section className='space-y-6'>
-            <Button variant='ghost' onClick={() => setSelectedId('')}>
-              <ArrowLeft className='size-4' />
-              {t('Back to models')}
-            </Button>
-            <ModelDetailsBody key={selected.id} model={selected} pricesOnly />
-          </section>
-        ) : (
-          <>
-            <div className='bg-card flex flex-col gap-4 rounded-2xl border p-4 md:p-5'>
-              <div className='relative'>
-                <Search className='text-muted-foreground absolute top-3 left-3 size-4' />
-                <Input
-                  className='h-10 pl-10'
-                  placeholder={t('Search model name or model ID')}
-                  aria-label={t('Search models')}
-                  value={search}
-                  onChange={(event) => {
-                    setSearch(event.target.value)
-                    setLimit(24)
-                  }}
-                />
+          <div className='market-hero-art' aria-hidden='true'>
+            <div className='market-orbit' />
+            <div className='market-art-layer layer-back' />
+            <div className='market-art-layer layer-middle' />
+            <div className='market-art-layer layer-front'>
+              <div className='market-art-top'>
+                <Boxes size={26} />
+                <span>API / 01</span>
               </div>
-              <div
-                role='group'
-                aria-label={t('Model category')}
-                className='flex flex-wrap gap-2'
-              >
-                {(['all', 'chat', 'image', 'video', 'audio'] as const).map(
-                  (type) => (
-                    <Button
-                      key={type}
-                      variant={category === type ? 'default' : 'outline'}
-                      size='sm'
-                      className='rounded-full'
-                      aria-pressed={category === type}
-                      onClick={() => {
-                        setCategory(type)
-                        setLimit(24)
-                      }}
-                    >
-                      {t(TYPE_LABELS[type])}
-                      <span className='opacity-60'>
-                        {type === 'all'
-                          ? models.length
-                          : models.filter((model) => model.type === type)
-                              .length}
-                      </span>
-                    </Button>
-                  )
-                )}
+              <div className='market-art-symbol'>
+                <Code2 size={72} strokeWidth={1.3} />
+              </div>
+              <div className='market-art-bottom'>
+                <span className='market-art-bar' />
+                <span>CONNECTED</span>
+                <Sparkles size={14} />
               </div>
             </div>
+            <div className='market-art-chip chip-top'>
+              <span />
+              AI
+            </div>
+            <div className='market-art-chip chip-bottom'>∞</div>
+          </div>
+        </header>
+        <div className='market-search-row'>
+          <div className='market-search'>
+            <Search className='text-muted-foreground size-5' aria-hidden />
+            <Input
+              value={search}
+              aria-label={t('Search models')}
+              placeholder={t('Search models, manufacturers or tags…')}
+              onChange={(event) => {
+                setSearch(event.target.value)
+                setLimit(24)
+              }}
+            />
+            {search && (
+              <Button
+                variant='ghost'
+                size='icon'
+                onClick={() => {
+                  setSearch('')
+                  setLimit(24)
+                }}
+                aria-label={t('Clear search')}
+              >
+                <X className='size-4' />
+              </Button>
+            )}
+          </div>
+          <Button
+            variant='outline'
+            className='market-mobile-filter-toggle'
+            aria-expanded={mobileFilters}
+            aria-controls='market-filters'
+            onClick={() => setMobileFilters((value) => !value)}
+          >
+            <SlidersHorizontal className='size-4' />
+            {t('Filters')}
+            {activeFilters.length > 0 && <Badge>{activeFilters.length}</Badge>}
+          </Button>
+        </div>
+        <div className='market-workspace'>
+          <aside
+            id='market-filters'
+            className={`market-sidebar ${mobileFilters ? 'is-expanded' : ''}`}
+            aria-label={t('Model filters')}
+          >
+            <MarketFilters
+              models={models}
+              summaries={summaries}
+              value={filters}
+              search={deferredSearch}
+              onChange={updateFilters}
+              onReset={resetFilters}
+            />
+          </aside>
+          <section
+            className='market-results-section'
+            aria-label={t('Model results')}
+          >
+            <div className='market-toolbar'>
+              <span
+                className='market-result-count'
+                role='status'
+                aria-live='polite'
+              >
+                <b>{filtered.length}</b> {t('Models available')}
+                {activeFilters.length > 0 && (
+                  <span className='text-muted-foreground'>
+                    {' '}
+                    / {models.length}
+                  </span>
+                )}
+              </span>
+              <div className='flex min-w-0 items-center gap-2'>
+                <Select
+                  value={sort}
+                  onValueChange={(value) => {
+                    if (value && value in SORT_LABELS) {
+                      setSort(value as MarketSort)
+                      setLimit(24)
+                    }
+                  }}
+                >
+                  <SelectTrigger
+                    className='market-sort-select'
+                    aria-label={t('Sort models')}
+                  >
+                    <ArrowDownWideNarrow className='size-4' aria-hidden />
+                    <SelectValue>{t(SORT_LABELS[sort])}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(SORT_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {t(label)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div
+                  className='market-view-switch'
+                  role='group'
+                  aria-label={t('Display mode')}
+                >
+                  <Button
+                    variant={view === 'grid' ? 'secondary' : 'ghost'}
+                    size='icon'
+                    aria-label={t('Grid view')}
+                    aria-pressed={view === 'grid'}
+                    onClick={() => setView('grid')}
+                  >
+                    <LayoutGrid className='size-4' />
+                  </Button>
+                  <Button
+                    variant={view === 'list' ? 'secondary' : 'ghost'}
+                    size='icon'
+                    aria-label={t('List view')}
+                    aria-pressed={view === 'list'}
+                    onClick={() => setView('list')}
+                  >
+                    <List className='size-4' />
+                  </Button>
+                </div>
+              </div>
+            </div>
+            {activeFilters.length > 0 && (
+              <div className='market-active-filters'>
+                {activeFilters.map(([key, value]) => {
+                  let label = value
+                  if (key === 'category') {
+                    label = TYPE_LABELS[value as keyof typeof TYPE_LABELS]
+                  }
+                  if (key === 'billing') label = BILLING_LABELS[value]
+                  return (
+                    <Button
+                      key={key}
+                      variant='secondary'
+                      size='sm'
+                      onClick={() =>
+                        updateFilters({ ...filters, [key]: 'all' })
+                      }
+                      aria-label={t('Remove filter {{name}}', {
+                        name: t(label),
+                      })}
+                    >
+                      {t(label)}
+                      <X className='size-3' aria-hidden />
+                    </Button>
+                  )
+                })}
+              </div>
+            )}
             {query.isLoading && (
               <LoadingState message={t('Loading all site models...')} />
             )}
@@ -209,105 +341,80 @@ export function PlatformModelsPage(props: {
                 onRetry={() => void query.refetch()}
               />
             )}
+            {!query.isError && summaryQuery.isError && (
+              <div role='status' className='market-price-error'>
+                <span>
+                  {t(
+                    'Live prices are temporarily unavailable. You can still browse models.'
+                  )}
+                </span>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => void summaryQuery.refetch()}
+                >
+                  {t('Retry')}
+                </Button>
+              </div>
+            )}
             {!query.isLoading && !query.isError && (
               <>
-                <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-3'>
-                  {filtered.slice(0, limit).map((model) => {
-                    const Icon = ICONS[model.type]
-                    return (
-                      <Card
-                        key={model.id}
-                        className='gap-4 transition-shadow hover:shadow-md'
-                      >
-                        <CardHeader>
-                          <div className='flex items-start justify-between gap-3'>
-                            <div className='bg-muted grid size-11 place-items-center rounded-xl'>
-                              {model.icon ? (
-                                getLobeIcon(model.icon, 24)
-                              ) : (
-                                <Icon className='size-5' />
-                              )}
-                            </div>
-                            <Badge variant='outline'>
-                              {t(TYPE_LABELS[model.type])}
-                            </Badge>
-                          </div>
-                          <h2 className='mt-3 text-lg font-semibold break-words'>
-                            {model.name}
-                          </h2>
-                          <div className='flex min-w-0 items-center'>
-                            <code className='text-muted-foreground min-w-0 flex-1 text-xs break-all'>
-                              {model.id}
-                            </code>
-                            <CopyButton value={model.id} size='sm' />
-                          </div>
-                        </CardHeader>
-                        <CardContent className='flex-1'>
-                          <p className='text-muted-foreground line-clamp-2 min-h-10 text-xs leading-5'>
-                            {model.description}
-                          </p>
-                        </CardContent>
-                        <CardFooter className='flex items-center justify-between border-t pt-3'>
-                          <span className='text-muted-foreground text-xs'>
-                            {t(
-                              model.available
-                                ? 'API enabled'
-                                : 'Temporarily unavailable'
-                            )}
-                          </span>
-                          <Button
-                            size='sm'
-                            variant='ghost'
-                            onClick={() => setSelectedId(model.id)}
-                            aria-label={`${t(prices ? 'View prices' : 'API details')} ${model.name}`}
-                          >
-                            {t(prices ? 'View prices' : 'API details')}
-                            <ChevronRight className='size-4' />
-                          </Button>
-                        </CardFooter>
-                      </Card>
-                    )
-                  })}
+                <div
+                  data-market-results
+                  className={`market-results market-view-${view}`}
+                >
+                  {filtered.slice(0, limit).map((model) => (
+                    <MarketCard
+                      key={model.id}
+                      model={model}
+                      summary={summaries[model.id]}
+                      loading={summaryQuery.isLoading}
+                      onOpen={() => setSelectedId(model.id)}
+                    />
+                  ))}
                 </div>
                 {!filtered.length && (
-                  <p className='text-muted-foreground py-12 text-center'>
-                    {t('No matching models')}
-                  </p>
+                  <EmptyState
+                    icon={Search}
+                    title={t('No matching models')}
+                    description={t(
+                      'Try another keyword or clear your filters.'
+                    )}
+                    action={
+                      <Button variant='outline' onClick={resetFilters}>
+                        {t('Reset filters')}
+                      </Button>
+                    }
+                  />
                 )}
                 {filtered.length > limit && (
-                  <div className='text-center'>
+                  <div className='py-8 text-center'>
                     <Button
                       variant='outline'
-                      onClick={() => setLimit((previous) => previous + 24)}
+                      onClick={() => setLimit((value) => value + 24)}
                     >
-                      {t('Show more models')} ({filtered.length - limit})
+                      {t('Show more models')} · {filtered.length - limit}
                     </Button>
                   </div>
                 )}
               </>
             )}
-          </>
-        )}
-        {!prices && (
-          <Dialog
-            open={Boolean(selected)}
-            onOpenChange={(open) => {
-              if (!open) setSelectedId('')
-            }}
-            title={t('Model details')}
-            description={t(
-              'Published model parameters, connection examples and current prices'
-            )}
-            contentClassName='sm:max-w-5xl'
-            bodyClassName='pb-2'
-          >
-            {selected && (
-              <ModelDetailsBody key={selected.id} model={selected} />
-            )}
-          </Dialog>
-        )}
+            <p className='market-price-note'>
+              {t(
+                summaryQuery.data?.audience === 'account'
+                  ? 'Your account prices. Final server-authorized settlement is authoritative.'
+                  : 'Current site public prices. Sign in to see the prices applicable to your account.'
+              )}
+            </p>
+          </section>
+        </div>
+        <ModelDetailsDialog
+          model={selected}
+          summary={selected ? summaries[selected.id] : undefined}
+          onClose={() => setSelectedId('')}
+        />
         <Footer />
-      </div>
+      </main>
     </PublicLayout>
   )
 }

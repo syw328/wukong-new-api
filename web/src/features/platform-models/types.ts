@@ -23,6 +23,8 @@ export type PlatformModel = {
   parameters: ModelParameter[]
   endpoint: string
   quote_endpoint?: string
+  vendor?: string
+  protocol?: string
   icon?: string
 }
 export type PriceField = ModelParameter & { value: Scalar }
@@ -40,7 +42,11 @@ export type PriceRoute = {
   provider: string
   sku: string
   variantIndex: number
-  variants: Array<{ index: number; label: string }>
+  variants: Array<{
+    index: number
+    label: string
+    price?: StartingPrice | null
+  }>
   fields: PriceField[]
   rows: PriceRow[]
   successRate: number | null
@@ -70,3 +76,41 @@ export const TYPE_LABELS: Record<ModelType | 'all', string> = {
   video: 'Video models',
   audio: 'Audio models',
 }
+
+export type BillingUnit = 'call' | 'tokens' | 'second' | 'characters'
+export type StartingPrice = {
+  amount: number
+  unit: BillingUnit
+  input?: number | null
+  output?: number | null
+  routeId: string
+  variantIndex: number
+  values: Record<string, Scalar>
+}
+export type ModelSummary = {
+  startingPrice: StartingPrice | null
+  billingUnits: BillingUnit[]
+  minimumComplete: boolean
+  routeCount: number
+  pricedRouteCount: number
+  unavailableRouteCount: number
+  successRate: number | null
+  samples: number
+  statisticsAvailable: boolean
+}
+export type MarketSummaries = {
+  summaries: Record<string, ModelSummary>
+  pricesAvailable: boolean
+  audience: 'account' | 'site'
+  currency: string
+  priceBookId: string
+  lockedAt: string
+  validUntil: string
+}
+export type MarketFiltersValue = {
+  category: ModelType | 'all'
+  vendor: string
+  tag: string
+  billing: string
+}
+export type MarketSort = 'default' | 'name' | 'price' | 'success' | 'routes'

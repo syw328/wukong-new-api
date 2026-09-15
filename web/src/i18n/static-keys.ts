@@ -19,6 +19,27 @@ For commercial licensing, please contact support@quantumnous.com
 // Static translation keys that don't get picked up by the t('...') regex.
 // These cover dynamic labels (e.g. constants, configs) that are passed into t at runtime.
 export const STATIC_I18N_KEYS = [
+  // Platform marketplace facets and sort labels.
+  'All billing methods',
+  'Billed per request',
+  'Billed per token',
+  'Per second',
+  'Per character',
+  'Recommended order',
+  'Model name',
+  'Price: low to high (same unit)',
+  'Success rate: high to low',
+  'Route count: high to low',
+  'Manufacturers',
+  'Model tags',
+  'Billing method',
+  'Model category',
+  'All tags',
+  'Starting from',
+  'Reference price',
+  'OpenAI compatible',
+  'Media API',
+
   'For this channel, map the model name in client requests to the model name sent upstream.',
   // Channel provider labels, descriptions and presentation badges.
   'Zhipu GLM',

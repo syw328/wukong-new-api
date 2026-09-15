@@ -3,6 +3,7 @@ import { ChevronDown, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { CopyButton } from '@/components/copy-button'
 import { ErrorState } from '@/components/error-state'
 import { LoadingState } from '@/components/loading-state'
 import { Badge } from '@/components/ui/badge'
@@ -31,7 +32,7 @@ import {
 } from '@/components/ui/table'
 
 import { usePlatformPrices } from './api'
-import { formatPriceBookDate } from './helpers'
+import { formatPriceBookDate, routePriceOrder } from './helpers'
 import type { PriceField, PriceRoute, PriceSelections, Scalar } from './types'
 
 const RATE_LABELS: Record<string, string> = {
@@ -147,7 +148,7 @@ function RouteCard(props: {
   }
   return (
     <section
-      className='bg-card min-w-0 overflow-hidden rounded-2xl border'
+      className='market-route-card bg-card min-w-0 overflow-hidden rounded-2xl border'
       aria-label={`${route.provider} ${route.sku}`}
     >
       <header className='flex flex-wrap items-center gap-2 border-b px-5 py-4'>
@@ -162,7 +163,56 @@ function RouteCard(props: {
               : 'Specification pricing'
           )}
         </Badge>
+        <CopyButton
+          size='sm'
+          aria-label={t('Copy route prices')}
+          value={[
+            route.provider,
+            route.sku,
+            ...route.rows.flatMap((row) =>
+              row.tokenRates.length &&
+              (props.type === 'chat' || row.estimate?.nativeUnit === 'tokens')
+                ? row.tokenRates.map(
+                    (rate) =>
+                      `${t(row.name)} · ${t(RATE_LABELS[rate.label] || rate.label)}: ${amount(rate.amount)} ${t('credits')} / ${t('1M tokens')}`
+                  )
+                : [
+                    `${t(row.name)}: ${amount(row.estimate?.nativeUnit === 'call' ? row.estimate.amount : row.estimate?.unitPrice)} ${t('credits')} / ${unit(row.estimate?.nativeUnit || '')}`,
+                  ]
+            ),
+          ].join('\n')}
+        />
       </header>
+      {route.variants.length > 1 && (
+        <div
+          className='flex flex-wrap gap-2 border-b p-4'
+          role='group'
+          aria-label={t('Published specifications')}
+        >
+          {route.variants.map((variant) => (
+            <Button
+              key={variant.index}
+              variant={
+                variant.index === route.variantIndex ? 'secondary' : 'outline'
+              }
+              size='sm'
+              className='h-auto flex-col items-start gap-1 py-2 text-left text-xs whitespace-normal'
+              aria-pressed={variant.index === route.variantIndex}
+              onClick={() =>
+                props.onChange(variant.index, variant.price?.values || {})
+              }
+            >
+              <span>{t(variant.label)}</span>
+              {variant.price && (
+                <span className='font-mono text-[var(--market-amber)]'>
+                  {amount(variant.price.amount)} {t('credits')} /{' '}
+                  {unit(variant.price.unit)}
+                </span>
+              )}
+            </Button>
+          ))}
+        </div>
+      )}
       <Table>
         <TableHeader>
           <TableRow>
@@ -330,6 +380,7 @@ function RouteCard(props: {
 export function ModelPrices(props: { model: string }) {
   const { t, i18n } = useTranslation()
   const [selections, setSelections] = useState<PriceSelections>({})
+  const [sort, setSort] = useState('price')
   const query = usePlatformPrices(props.model, selections)
   if (query.isLoading) {
     return <LoadingState message={t('Loading current prices...')} />
@@ -350,6 +401,14 @@ export function ModelPrices(props: { model: string }) {
   }
   const data = query.data
   const date = (value: string) => formatPriceBookDate(value, i18n.language)
+  const orderedRoutes = [...data.routes].sort((left, right) => {
+    if (sort === 'success') {
+      return (right.successRate ?? -1) - (left.successRate ?? -1)
+    }
+    const a = routePriceOrder(left),
+      b = routePriceOrder(right)
+    return a.unit.localeCompare(b.unit) || a.amount - b.amount
+  })
 
   return (
     <div className='space-y-6'>
@@ -382,8 +441,54 @@ export function ModelPrices(props: { model: string }) {
           )}
         </p>
       )}
-      <div className='grid items-start gap-4 lg:grid-cols-2'>
-        {data.routes.map((route) => (
+      <div className='bg-muted/20 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3'>
+        <div className='flex flex-wrap items-center gap-2 text-xs'>
+          <strong>
+            {t('{{count}} routes', {
+              count: data.routes.length + data.unavailable.length,
+            })}
+          </strong>
+          <Badge variant='secondary'>
+            {t('{{count}} priced routes', { count: data.routes.length })}
+          </Badge>
+          {data.unavailable.length > 0 && (
+            <Badge variant='outline'>
+              {t('{{count}} prices unavailable', {
+                count: data.unavailable.length,
+              })}
+            </Badge>
+          )}
+        </div>
+        <Select
+          value={sort}
+          onValueChange={(value) => {
+            if (value) setSort(value)
+          }}
+        >
+          <SelectTrigger
+            className='h-8 max-w-full text-xs'
+            aria-label={t('Sort routes')}
+          >
+            <SelectValue>
+              {t(
+                sort === 'success'
+                  ? 'Success rate: high to low'
+                  : 'Price: low to high (same unit)'
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='price'>
+              {t('Price: low to high (same unit)')}
+            </SelectItem>
+            <SelectItem value='success'>
+              {t('Success rate: high to low')}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className='grid grid-cols-1 items-start gap-4'>
+        {orderedRoutes.map((route) => (
           <RouteCard
             key={route.id}
             route={route}
