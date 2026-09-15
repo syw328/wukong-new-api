@@ -6512,7 +6512,7 @@
     "1M characters": "1M characters",
     "Reference video": "Reference video",
     "Text characters": "Text characters",
-    "默认规格": "默认规格",
+    "Default specification": "Thông số mặc định",
     "Use the OpenAI-compatible chat endpoint with the model ID below.": "Use the OpenAI-compatible chat endpoint with the model ID below.",
     "Images, video and audio use the platform asynchronous media API. Parameters match this model on the website; request a quote before each creation.": "Images, video and audio use the platform asynchronous media API. Parameters match this model on the website; request a quote before each creation.",
     "The portal API key belongs to this site. Never send the key to an upstream provider.": "The portal API key belongs to this site. Never send the key to an upstream provider.",

@@ -6569,7 +6569,7 @@
     "1M characters": "百万字符",
     "Reference video": "参考视频",
     "Text characters": "文本字符数",
-    "默认规格": "默认规格",
+    "Default specification": "默认规格",
     "Use the OpenAI-compatible chat endpoint with the model ID below.": "使用 OpenAI 兼容对话接口，model 填写下方模型 ID。",
     "Images, video and audio use the platform asynchronous media API. Parameters match this model on the website; request a quote before each creation.": "图片、视频与音频使用平台原生异步媒体 API，params 与本站该模型一致，每次创建任务前先取得本次报价。",
     "The portal API key belongs to this site. Never send the key to an upstream provider.": "使用本站 API 密钥，不要将该密钥发送至任何上游厂商。",

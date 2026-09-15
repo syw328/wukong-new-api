@@ -37,6 +37,7 @@ export const STATIC_I18N_KEYS = [
   'All tags',
   'Starting from',
   'Reference price',
+  'Default specification',
   'OpenAI compatible',
   'Media API',
 
