@@ -1,3 +1,8 @@
+import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+
+import { useStatus } from '@/hooks/use-status'
+import { parseHeaderNavModulesFromStatus } from '@/lib/nav-modules'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -16,11 +21,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMemo } from 'react'
-import { useTranslation } from 'react-i18next'
-
-import { useStatus } from '@/hooks/use-status'
-import { parseHeaderNavModulesFromStatus } from '@/lib/nav-modules'
+import { portalRuntime } from '@/lib/portal-runtime'
 import { useAuthStore } from '@/stores/auth-store'
 
 export type TopNavLink = {
@@ -77,6 +78,13 @@ export function useTopNavLinks(): TopNavLink[] {
   if (pricing && typeof pricing === 'object' && pricing.enabled) {
     const requiresAuth = pricing.requireAuth && !isAuthed
     links.push({ title: t('Model Square'), href: '/pricing', requiresAuth })
+    if (portalRuntime().basePath) {
+      links.push({
+        title: t('Model Prices'),
+        href: '/model-prices',
+        requiresAuth,
+      })
+    }
   }
 
   // Rankings

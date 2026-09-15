@@ -1748,3 +1748,38 @@ func TestPrepareTaskPluginEndpointFiltersEachSharedCandidate(t *testing.T) {
 		})
 	}
 }
+
+func TestPlatformMediaIdempotencyPersistsAcrossPollAndRejectsConflicts(t *testing.T) {
+	setupTaskPluginRouteDB(t)
+	created := 0
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set("id", 77); c.Next() })
+	router.POST("/v1/media/generations", PlatformMediaIdempotency(), func(c *gin.Context) {
+		created++
+		fingerprint := c.GetString("platform_media_request_fingerprint")
+		state, err := common.Marshal(map[string]any{"request_fingerprint": fingerprint})
+		require.NoError(t, err)
+		data, err := common.Marshal(map[string]any{"status": "completed"})
+		require.NoError(t, err)
+		task := &model.Task{TaskID: c.GetString("platform_media_public_task_id"), UserId: 77, Status: model.TaskStatusSuccess, Data: data}
+		task.PrivateData.PluginState = state
+		require.NoError(t, model.DB.Create(task).Error)
+		c.JSON(202, gin.H{"id": task.TaskID})
+	})
+	call := func(body, key string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/v1/media/generations", strings.NewReader(body))
+		req.Header.Set("Idempotency-Key", key)
+		res := httptest.NewRecorder()
+		router.ServeHTTP(res, req)
+		return res
+	}
+	assert.Equal(t, 400, call(`{"model":"test"}`, "").Code)
+	first := call(`{"model":"test","prompt":"one"}`, "request-1234")
+	require.Equal(t, 202, first.Code)
+	replay := call(`{"prompt":"one","model":"test"}`, "request-1234")
+	require.Equal(t, 200, replay.Code)
+	assert.Contains(t, replay.Body.String(), `"replayed":true`)
+	assert.Equal(t, 409, call(`{"model":"test","prompt":"two"}`, "request-1234").Code)
+	assert.Equal(t, 1, created)
+	assert.Empty(t, platformMediaLocks.entries)
+}

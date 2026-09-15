@@ -609,10 +609,10 @@ func (a *TaskAdaptor) FetchTask(baseURL, key string, task *model.Task, proxy str
 	if err != nil {
 		return nil, err
 	}
-	return a.doFetchDescriptor(baseURL, proxy, value)
+	return a.doFetchDescriptor(baseURL, proxy, value, task)
 }
 
-func (a *TaskAdaptor) doFetchDescriptor(baseURL, proxy string, value any) (*http.Response, error) {
+func (a *TaskAdaptor) doFetchDescriptor(baseURL, proxy string, value any, identityTasks ...*model.Task) (*http.Response, error) {
 	var descriptor requestDescriptor
 	if err := convert(value, &descriptor); err != nil {
 		return nil, err
@@ -620,6 +620,17 @@ func (a *TaskAdaptor) doFetchDescriptor(baseURL, proxy string, value any) (*http
 	if err := pluginruntime.ValidateRequestURL(descriptor.URL, baseURL, a.plugin.Meta.AllowedHosts); err != nil {
 		return nil, err
 	}
+	if descriptor.Headers == nil {
+		descriptor.Headers = map[string]string{}
+	}
+	userID := 0
+	if len(identityTasks) == 1 && identityTasks[0] != nil {
+		userID = identityTasks[0].UserId
+	}
+	if err := channel.ApplyPlatformMediaIdentity(a.plugin.Meta.Key, baseURL, descriptor.URL, userID, descriptor.Headers); err != nil {
+		return nil, err
+	}
+
 	var requestBody io.Reader
 	if descriptor.Body != nil {
 		if bodyText, ok := descriptor.Body.(string); ok {
@@ -646,6 +657,11 @@ func (a *TaskAdaptor) doFetchDescriptor(baseURL, proxy string, value any) (*http
 	client, err := service.GetHttpClientWithProxy(proxy)
 	if err != nil {
 		return nil, err
+	}
+	if a.plugin.Meta.Key == "platform-media" {
+		isolated := *client
+		isolated.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+		client = &isolated
 	}
 	started := time.Now()
 	resp, err := client.Do(req)
@@ -942,6 +958,13 @@ func (a *TaskAdaptor) BuildContentRequest(task *model.Task, artifactKey string, 
 	if err = convert(value, &descriptor); err != nil {
 		return nil, err
 	}
+	if descriptor.Headers == nil {
+		descriptor.Headers = map[string]string{}
+	}
+	if err := channel.ApplyPlatformMediaIdentity(a.plugin.Meta.Key, a.info.ChannelBaseUrl, descriptor.URL, task.UserId, descriptor.Headers); err != nil {
+		return nil, err
+	}
+
 	method := strings.ToUpper(strings.TrimSpace(descriptor.Method))
 	if method == "" {
 		method = strings.ToUpper(strings.TrimSpace(clientRequest.Method))
@@ -1239,6 +1262,12 @@ func (a *TaskAdaptor) buildSubmit(c *gin.Context, info *relaycommon.RelayInfo) (
 	if descriptor.RewriteModel != "" {
 		info.UpstreamModelName = descriptor.RewriteModel
 	}
+	if descriptor.Headers == nil {
+		descriptor.Headers = map[string]string{}
+	}
+	if err := channel.ApplyPlatformMediaIdentity(a.plugin.Meta.Key, info.ChannelBaseUrl, descriptor.URL, info.UserId, descriptor.Headers); err != nil {
+		return nil, err
+	}
 	a.submit = &descriptor
 	method := strings.ToUpper(strings.TrimSpace(descriptor.Method))
 	if method == "" {
@@ -1346,6 +1375,9 @@ func (a *TaskAdaptor) submitContext(c *gin.Context, info *relaycommon.RelayInfo)
 			})
 		}
 		ctx["originTasks"] = originTasks
+	}
+	if c != nil {
+		ctx["platformRequestFingerprint"] = c.GetString("platform_media_request_fingerprint")
 	}
 	ctx["publicTaskId"] = info.PublicTaskID
 	ctx["model"] = info.OriginModelName

@@ -20,12 +20,10 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 import z from 'zod'
 
 import { PlatformModelsPage } from '@/features/platform-models'
-import { ModelDetails } from '@/features/pricing/components/model-details'
 import { getModuleAccessForGuard } from '@/lib/nav-modules'
-import { portalRuntime } from '@/lib/portal-runtime'
 import { useAuthStore } from '@/stores/auth-store'
 
-const modelDetailsSearchSchema = z.object({
+const pricingSearchSchema = z.object({
   search: z.string().optional(),
   sort: z.string().optional(),
   vendor: z.string().optional(),
@@ -38,8 +36,8 @@ const modelDetailsSearchSchema = z.object({
   rechargePrice: z.boolean().optional(),
 })
 
-export const Route = createFileRoute('/pricing/$modelId/')({
-  validateSearch: modelDetailsSearchSchema,
+export const Route = createFileRoute('/model-prices/')({
+  validateSearch: pricingSearchSchema,
   beforeLoad: async ({ context, location }) => {
     const access = await getModuleAccessForGuard(context.queryClient, 'pricing')
     if (!access.enabled) {
@@ -55,14 +53,5 @@ export const Route = createFileRoute('/pricing/$modelId/')({
       }
     }
   },
-  component: PortalModelDetails,
+  component: () => <PlatformModelsPage mode='prices' />,
 })
-
-function PortalModelDetails() {
-  const { modelId } = Route.useParams()
-  return portalRuntime().basePath ? (
-    <PlatformModelsPage initialModel={modelId} />
-  ) : (
-    <ModelDetails />
-  )
-}

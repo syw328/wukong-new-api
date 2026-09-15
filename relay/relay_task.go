@@ -212,7 +212,10 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 	// buildSubmitRequest runs during validation and the unreleased plugin
 	// contract exposes this host-generated id to that hook.
 	if info.PublicTaskID == "" {
-		info.PublicTaskID = model.GenerateTaskID()
+		info.PublicTaskID = c.GetString("platform_media_public_task_id")
+		if info.PublicTaskID == "" {
+			info.PublicTaskID = model.GenerateTaskID()
+		}
 	}
 	adaptor.Init(info)
 	// Plugin submit hooks run during ValidateRequestAndSetAction and cache the

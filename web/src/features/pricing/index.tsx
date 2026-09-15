@@ -1,3 +1,8 @@
+import { useCallback, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+
+import { PublicLayout } from '@/components/layout'
+import { PageTransition } from '@/components/page-transition'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -16,11 +21,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useCallback, useMemo, useState } from 'react'
-import { useTranslation } from 'react-i18next'
-
-import { PublicLayout } from '@/components/layout'
-import { PageTransition } from '@/components/page-transition'
+import { PlatformModelsPage } from '@/features/platform-models'
+import { portalRuntime } from '@/lib/portal-runtime'
 
 import {
   LoadingSkeleton,
@@ -36,7 +38,7 @@ import { EXCLUDED_GROUPS, VIEW_MODES } from './constants'
 import { useFilters } from './hooks/use-filters'
 import { usePricingData } from './hooks/use-pricing-data'
 
-export function Pricing() {
+function LegacyPricing() {
   const { t } = useTranslation()
   const [selectedModelName, setSelectedModelName] = useState<string | null>(
     null
@@ -286,4 +288,8 @@ export function Pricing() {
       </div>
     </PublicLayout>
   )
+}
+
+export function Pricing() {
+  return portalRuntime().basePath ? <PlatformModelsPage /> : <LegacyPricing />
 }

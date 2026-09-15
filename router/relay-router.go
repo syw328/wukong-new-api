@@ -11,6 +11,7 @@ import (
 )
 
 func SetRelayRouter(router *gin.Engine) {
+	router.POST("/v1/media/quotes", middleware.RouteTag("relay"), middleware.TokenAuth(), middleware.ModelRequestRateLimit(), controller.PostPlatformMediaQuote)
 	router.Use(middleware.CORS())
 	router.Use(middleware.DecompressRequestMiddleware())
 	router.Use(middleware.BodyStorageCleanup()) // 清理请求体存储

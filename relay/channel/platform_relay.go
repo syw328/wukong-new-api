@@ -1,6 +1,8 @@
 package channel
 
 import (
+	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -127,4 +129,49 @@ func injectPlatformRelayHeaders(headers map[string]string, info *common.RelayInf
 	if providerUserId := platformProviderUserId(cfg, info.UserId); providerUserId != "" {
 		headers[platformRelayUserHeader] = providerUserId
 	}
+}
+
+// PlatformRelayIdentityHeaders fails closed when the authenticated portal user
+// has no platform OAuth binding. The service account is never a fallback payer.
+func PlatformRelayIdentityHeaders(userID int) (map[string]string, error) {
+	cfg := loadPlatformRelayConfig()
+	if cfg == nil || len(cfg.secret) < 32 || cfg.providerId <= 0 || userID <= 0 {
+		return nil, fmt.Errorf("platform relay identity is unavailable")
+	}
+	binding, err := model.GetUserOAuthBinding(userID, cfg.providerId)
+	if err != nil || binding == nil || strings.TrimSpace(binding.ProviderUserId) == "" {
+		return nil, fmt.Errorf("platform OAuth binding is required")
+	}
+	return map[string]string{platformRelaySecretHeader: cfg.secret, platformRelayUserHeader: strings.TrimSpace(binding.ProviderUserId)}, nil
+}
+
+// Only the managed media integration may attach identity, and only after its
+// destination is matched against the operator-owned origin. No client header
+// or plugin-provided URL can select a different recipient for tenant secrets.
+func ApplyPlatformMediaIdentity(pluginKey, baseURL, requestURL string, userID int, headers map[string]string) error {
+	if pluginKey != "platform-media" {
+		return nil
+	}
+	expected := strings.TrimRight(os.Getenv("PLATFORM_MEDIA_BASE_URL"), "/")
+	parsed, err := url.Parse(requestURL)
+	base, baseErr := url.Parse(expected)
+	if expected == "" || strings.TrimRight(baseURL, "/") != expected || baseErr != nil || err != nil ||
+		base.User != nil || parsed.User != nil || parsed.Scheme != base.Scheme || parsed.Host != base.Host || parsed.RawQuery != "" ||
+		parsed.Fragment != "" || (base.Scheme != "https" && !(base.Scheme == "http" && (base.Hostname() == "127.0.0.1" || base.Hostname() == "localhost"))) ||
+		(parsed.Path != "/v1/media/generations" && !strings.HasPrefix(parsed.Path, "/v1/media/generations/")) {
+		return fmt.Errorf("platform media destination is not configured correctly")
+	}
+	identity, err := PlatformRelayIdentityHeaders(userID)
+	if err != nil {
+		return err
+	}
+	for key := range headers {
+		if strings.HasPrefix(strings.ToLower(key), "x-platform-") {
+			delete(headers, key)
+		}
+	}
+	for key, value := range identity {
+		headers[key] = value
+	}
+	return nil
 }
