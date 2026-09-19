@@ -18,6 +18,8 @@ export const meta = {
   ],
 };
 function bodyOf(value) { return typeof value === "string" ? JSON.parse(value) : value; }
+// api_key plugins receive the raw channel key; the host adds no auth scheme.
+function authorization(ctx) { return "Bearer " + ctx.apiKey; }
 function request(ctx) {
   const input = ctx.requestBody || {};
   const model = typeof input.model === "string" ? input.model.replace(/^platform-media:/, "") : "";
@@ -36,7 +38,7 @@ function platformState(data) {
 }
 export function buildSubmitRequest(ctx) {
   return { method: "POST", url: ctx.baseUrl.replace(/\/+$/, "") + "/v1/media/generations",
-    headers: { Authorization: ctx.authHeader, "Content-Type": "application/json", "Idempotency-Key": ctx.publicTaskId },
+    headers: { Authorization: authorization(ctx), "Content-Type": "application/json", "Idempotency-Key": ctx.publicTaskId },
     body: request(ctx), responseType: "json" };
 }
 export function extractUsage(ctx) { return { platform_credits: request(ctx).authorization_max }; }
@@ -51,7 +53,7 @@ export function parseSubmitResponse(ctx, response) {
 }
 export function buildQueryRequest(ctx) {
   return { method: "GET", url: ctx.baseUrl.replace(/\/+$/, "") + "/v1/media/generations/" + encodeURIComponent(ctx.taskId),
-    headers: { Authorization: ctx.authHeader }, responseType: "json" };
+    headers: { Authorization: authorization(ctx) }, responseType: "json" };
 }
 export function parseTaskResult(ctx, body) {
   const data = bodyOf(body); const status = platformState(data);
@@ -77,7 +79,7 @@ export function listArtifacts(task) {
 export function buildContentRequest(ctx) {
   if (ctx.artifactKey !== "result") throw new Error("artifact_not_found");
   return { method: "GET", url: ctx.baseUrl.replace(/\/+$/, "") + "/v1/media/generations/" + encodeURIComponent(ctx.upstreamTaskId || ctx.taskId) + "/content",
-    headers: { Authorization: ctx.authHeader } };
+    headers: { Authorization: authorization(ctx) } };
 }
 function renderTask(ctx, task) {
   const data = task.data || {};

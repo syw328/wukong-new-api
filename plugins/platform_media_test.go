@@ -31,7 +31,7 @@ func TestPlatformMediaNativeProtocol(t *testing.T) {
 		return decode(value)
 	}
 	request := map[string]any{"model": "image-test", "prompt": "test", "params": map[string]any{"resolution": "2K"}, "authorization_max": 0.4, "authorization_token": "signed-test-token", "confirmed_price_book_id": "book"}
-	ctx := map[string]any{"baseUrl": "https://platform.test", "authHeader": "Bearer test-only-key", "publicTaskId": "task_client", "platformRequestFingerprint": "fingerprint", "requestBody": request}
+	ctx := map[string]any{"baseUrl": "https://platform.test", "apiKey": "test-only-key", "authHeader": "test-only-key", "publicTaskId": "task_client", "platformRequestFingerprint": "fingerprint", "requestBody": request}
 	t.Run("all three modalities share exact platform protocol, not fabricated OpenAI image semantics", func(t *testing.T) {
 		assert.ElementsMatch(t, []string{"platform-media:image-test", "platform-media:video-test", "platform-media:audio-test"}, plugin.Meta.Models)
 		require.Len(t, plugin.Meta.Routes, 2)
@@ -39,6 +39,7 @@ func TestPlatformMediaNativeProtocol(t *testing.T) {
 		assert.Equal(t, "https://platform.test/v1/media/generations", submit["url"])
 		headers := decode(submit["headers"])
 		assert.Equal(t, "task_client", headers["Idempotency-Key"])
+		assert.Equal(t, "Bearer test-only-key", headers["Authorization"], "the platform only accepts Bearer credentials")
 		assert.Equal(t, request, submit["body"])
 		assert.Equal(t, 0.4, invoke("extractUsage", ctx)["platform_credits"])
 	})
@@ -56,14 +57,17 @@ func TestPlatformMediaNativeProtocol(t *testing.T) {
 		saved := decode(accepted["state"])
 		assert.Equal(t, "fingerprint", saved["request_fingerprint"])
 		assert.NotContains(t, decode(accepted["taskData"]), "authorization_token")
-		queryCtx := map[string]any{"baseUrl": "https://platform.test", "authHeader": "Bearer test-only-key", "taskId": "act_1", "state": saved}
+		queryCtx := map[string]any{"baseUrl": "https://platform.test", "apiKey": "test-only-key", "authHeader": "test-only-key", "taskId": "act_1", "state": saved}
+		query := invoke("buildQueryRequest", queryCtx)
+		assert.Equal(t, "Bearer test-only-key", decode(query["headers"])["Authorization"])
 		completed := map[string]any{"id": "act_1", "status": "completed", "modality": "image", "billing": map[string]any{"state": "settled", "charged": 0.12}}
 		parsed := invoke("parseTaskResult", queryCtx, completed)
 		assert.Equal(t, "SUCCESS", parsed["status"])
 		assert.Equal(t, "fingerprint", decode(parsed["state"])["request_fingerprint"])
 		assert.Equal(t, 0.12, invoke("extractUsageOnComplete", queryCtx, parsed, completed)["platform_credits"])
-		content := invoke("buildContentRequest", map[string]any{"baseUrl": "https://platform.test", "authHeader": "Bearer test-only-key", "upstreamTaskId": "act_1", "artifactKey": "result"})
+		content := invoke("buildContentRequest", map[string]any{"baseUrl": "https://platform.test", "apiKey": "test-only-key", "authHeader": "test-only-key", "upstreamTaskId": "act_1", "artifactKey": "result"})
 		assert.Equal(t, "https://platform.test/v1/media/generations/act_1/content", content["url"])
+		assert.Equal(t, "Bearer test-only-key", decode(content["headers"])["Authorization"])
 	})
 	t.Run("unknown or charged failure does not prematurely refund a request", func(t *testing.T) {
 		for _, state := range []map[string]any{
