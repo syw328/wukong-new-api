@@ -223,3 +223,30 @@ func TestRedisFailurePolicies(t *testing.T) {
 	assert.Empty(t, userResponse.Body.String())
 	assert.Equal(t, http.StatusNoContent, performRateLimitRequest(router, "/email", "192.0.2.62:12345").Code)
 }
+
+func TestSessionRoutesDoNotSpendTheCriticalSignInBucket(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	useRateLimitMiniRedis(t)
+	previousEnabled, previousNum, previousDuration := common.CriticalRateLimitEnable, common.CriticalRateLimitNum, common.CriticalRateLimitDuration
+	common.CriticalRateLimitEnable, common.CriticalRateLimitNum, common.CriticalRateLimitDuration = true, 2, 60
+	t.Cleanup(func() {
+		common.CriticalRateLimitEnable, common.CriticalRateLimitNum, common.CriticalRateLimitDuration = previousEnabled, previousNum, previousDuration
+	})
+
+	router := gin.New()
+	require.NoError(t, router.SetTrustedProxies(nil))
+	ok := func(c *gin.Context) { c.Status(http.StatusNoContent) }
+	router.GET("/oauth/state", CriticalRateLimit(), ok)
+	router.GET("/auth/refresh", SessionRateLimit(), ok)
+
+	remoteAddr := "192.0.2.30:12345"
+	for i := 0; i < 2; i++ {
+		assert.Equal(t, http.StatusNoContent, performRateLimitRequest(router, "/oauth/state", remoteAddr).Code)
+	}
+	assert.Equal(t, http.StatusTooManyRequests, performRateLimitRequest(router, "/oauth/state", remoteAddr).Code)
+	for i := 0; i < 12; i++ {
+		assert.Equal(t, http.StatusNoContent, performRateLimitRequest(router, "/auth/refresh", remoteAddr).Code,
+			"session refresh has its own, larger bucket")
+	}
+	assert.Equal(t, http.StatusTooManyRequests, performRateLimitRequest(router, "/auth/refresh", remoteAddr).Code)
+}

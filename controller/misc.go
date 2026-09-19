@@ -139,6 +139,8 @@ func GetStatus(c *gin.Context) {
 		data["faq"] = console_setting.GetFAQ()
 	}
 
+	portal, hasPortal := common.PlatformPortalForRequest(c.Request)
+
 	// Add enabled custom OAuth providers
 	customProviders := oauth.GetEnabledCustomProviders()
 	if len(customProviders) > 0 {
@@ -156,7 +158,7 @@ func GetStatus(c *gin.Context) {
 			config := p.GetConfig()
 			providersInfo = append(providersInfo, CustomOAuthInfo{
 				Id:                    config.Id,
-				Name:                  config.Name,
+				Name:                  platformOAuthDisplayName(config.Slug, config.Name, portal, hasPortal),
 				Slug:                  config.Slug,
 				Icon:                  config.Icon,
 				ClientId:              config.ClientId,
@@ -167,7 +169,7 @@ func GetStatus(c *gin.Context) {
 		data["custom_oauth_providers"] = providersInfo
 	}
 
-	if portal, ok := common.PlatformPortalForRequest(c.Request); ok {
+	if hasPortal {
 		data["server_address"] = portal.Origin + portal.TransportPath
 		if portal.BrandName != "" {
 			data["system_name"] = portal.BrandName + " API 开放平台"
@@ -181,6 +183,16 @@ func GetStatus(c *gin.Context) {
 		"data":    data,
 	})
 	return
+}
+
+// platformOAuthDisplayName names the platform sign-in after the brand of the
+// domain being visited: one portal serves the main site and white-label agent
+// domains, so the stored provider name must not leak into other brands.
+func platformOAuthDisplayName(slug, name string, portal common.PlatformPortal, hasPortal bool) string {
+	if hasPortal && slug == "platform" && portal.BrandName != "" {
+		return portal.BrandName
+	}
+	return name
 }
 
 func GetNotice(c *gin.Context) {

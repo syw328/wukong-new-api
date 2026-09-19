@@ -178,6 +178,18 @@ func CriticalRateLimit() func(c *gin.Context) {
 	return defNext
 }
 
+// SessionRateLimit guards cookie-session refresh and logout in their own bucket.
+// Every portal page load refreshes the session and every platform sign-in
+// resets it, so sharing the Critical bucket locked visitors out of sign-in
+// (HTTP 429) after a couple of attempts. Credential and OAuth routes keep the
+// Critical limit; the global API limit still applies to these routes.
+func SessionRateLimit() func(c *gin.Context) {
+	if common.CriticalRateLimitEnable {
+		return rateLimitFactory(common.CriticalRateLimitNum*6, common.CriticalRateLimitDuration, "SS")
+	}
+	return defNext
+}
+
 func UserCriticalRateLimit(scope string) func(c *gin.Context) {
 	if !common.CriticalRateLimitEnable {
 		return defNext
