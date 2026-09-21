@@ -115,6 +115,12 @@ func platformProviderUserId(cfg *platformRelayConfig, userId int) string {
 	return providerUserId
 }
 
+// PlatformRelayChannel reports whether this request goes to the platform through the
+// wallet relay, i.e. the channels that receive the relay identity headers.
+func PlatformRelayChannel(info *common.RelayInfo) bool {
+	return loadPlatformRelayConfig().appliesTo(info)
+}
+
 // injectPlatformRelayHeaders 把平台记账头合并进 header override 结果；显式 override 优先。
 func injectPlatformRelayHeaders(headers map[string]string, info *common.RelayInfo) {
 	cfg := loadPlatformRelayConfig()
