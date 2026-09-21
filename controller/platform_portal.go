@@ -6,37 +6,20 @@ import (
 	"bytes"
 	"io"
 	"net/http"
-	"net/url"
-	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/plugins"
-	"github.com/QuantumNous/new-api/relay/channel"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 )
 
 var platformPortalClient = &http.Client{Timeout: 90 * time.Second,
 	CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
 
-func platformPortalOrigin(c *gin.Context) (string, bool) {
-	common.OptionMapRWMutex.RLock()
-	base := strings.TrimRight(common.OptionMap["PlatformPublicBaseURL"], "/")
-	common.OptionMapRWMutex.RUnlock()
-	if portal, ok := common.PlatformPortalForRequest(c.Request); ok {
-		base = portal.Origin
-	}
-	parsed, err := url.Parse(base)
-	if err != nil || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.Hostname() == "" || parsed.Path != "" ||
-		(parsed.Scheme != "https" && !(parsed.Scheme == "http" && (parsed.Hostname() == "127.0.0.1" || parsed.Hostname() == "localhost"))) {
-		return "", false
-	}
-	return base, true
-}
-
 func proxyPlatformPortal(c *gin.Context, path string, accountPrice bool, mediaQuote bool) {
-	origin, ok := platformPortalOrigin(c)
+	origin, ok := common.PlatformPortalOrigin(c.Request)
 	if !ok {
 		c.JSON(503, gin.H{"success": false, "message": "Platform catalog is not configured"})
 		return
@@ -72,7 +55,7 @@ func proxyPlatformPortal(c *gin.Context, path string, accountPrice bool, mediaQu
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("Content-Type", "application/json")
 	if (accountPrice && c.GetInt("id") > 0) || mediaQuote {
-		headers, identityErr := channel.PlatformRelayIdentityHeaders(c.GetInt("id"))
+		headers, identityErr := service.PlatformRelayIdentityHeaders(c.GetInt("id"))
 		if identityErr != nil {
 			c.JSON(403, gin.H{"success": false, "message": "Sign in with your platform account to continue"})
 			return

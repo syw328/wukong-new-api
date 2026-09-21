@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 )
 
 // PlatformPortal describes one request already bound to a tenant by the host.
@@ -43,4 +44,23 @@ func PlatformPortalForRequest(r *http.Request) (PlatformPortal, bool) {
 		return PlatformPortal{}, false
 	}
 	return portal, true
+}
+
+// PlatformPortalOrigin is where the portal calls the platform back: the signed
+// tenant origin of this request, else the configured PlatformPublicBaseURL.
+func PlatformPortalOrigin(r *http.Request) (string, bool) {
+	OptionMapRWMutex.RLock()
+	base := strings.TrimRight(OptionMap["PlatformPublicBaseURL"], "/")
+	OptionMapRWMutex.RUnlock()
+	if r != nil {
+		if portal, ok := PlatformPortalForRequest(r); ok {
+			base = portal.Origin
+		}
+	}
+	parsed, err := url.Parse(base)
+	if err != nil || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.Hostname() == "" || parsed.Path != "" ||
+		(parsed.Scheme != "https" && !(parsed.Scheme == "http" && (parsed.Hostname() == "127.0.0.1" || parsed.Hostname() == "localhost"))) {
+		return "", false
+	}
+	return base, true
 }

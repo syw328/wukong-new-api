@@ -462,6 +462,8 @@ func GetAffCode(c *gin.Context) {
 func GetSelf(c *gin.Context) {
 	id := c.GetInt("id")
 	userRole := c.GetInt("role")
+	// 平台钱包权威：钱包和看板显示平台当前余额，平台侧充值后不必重新登录开放平台。
+	service.RefreshPlatformQuotaMirror(c.Request, id, service.PlatformQuotaRefreshOnView)
 	user, err := model.GetSelfUserById(id)
 	if err != nil {
 		common.ApiError(c, err)

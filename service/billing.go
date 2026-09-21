@@ -35,6 +35,12 @@ func PreConsumeBilling(c *gin.Context, preConsumedQuota int, relayInfo *relaycom
 		)
 	}
 	session, apiErr := NewBillingSession(c, relayInfo, preConsumedQuota)
+	if apiErr != nil && apiErr.GetErrorCode() == types.ErrorCodeInsufficientUserQuota {
+		// 平台钱包权威时本地额度只是镜像：回平台重读，平台确实有余额就重试一次。
+		if quota, refreshed := RefreshPlatformQuotaMirror(c.Request, relayInfo.UserId, PlatformQuotaRefreshOnShortfall); refreshed && quota > 0 {
+			session, apiErr = NewBillingSession(c, relayInfo, preConsumedQuota)
+		}
+	}
 	if apiErr != nil {
 		return apiErr
 	}
