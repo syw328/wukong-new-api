@@ -3,8 +3,10 @@
 package relay
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/relay/channel"
@@ -96,4 +98,46 @@ func platformResponsesViaChat(c *gin.Context, info *relaycommon.RelayInfo, adapt
 		return nil, apiErr
 	}
 	return usage, nil
+}
+
+// nativeResponsesClient reports a Codex turn. Codex identifies itself in the
+// User-Agent, stamps x-codex-* keys into client_metadata and declares its tools
+// as additional_tools input items or namespace/custom tools — none of which a
+// Chat conversion keeps — so such bodies go to the platform unchanged.
+func nativeResponsesClient(c *gin.Context, request *dto.OpenAIResponsesRequest) bool {
+	if c != nil && c.Request != nil && strings.HasPrefix(strings.ToLower(c.Request.UserAgent()), "codex") {
+		return true
+	}
+	if request == nil {
+		return false
+	}
+	var metadata map[string]json.RawMessage
+	if len(request.ClientMetadata) > 0 && common.Unmarshal(request.ClientMetadata, &metadata) == nil {
+		for key := range metadata {
+			if strings.HasPrefix(strings.ToLower(key), "x-codex-") {
+				return true
+			}
+		}
+	}
+	var items []struct {
+		Type string `json:"type"`
+	}
+	if input := strings.TrimSpace(string(request.Input)); strings.HasPrefix(input, "[") && common.Unmarshal(request.Input, &items) == nil {
+		for _, item := range items {
+			if item.Type == "additional_tools" {
+				return true
+			}
+		}
+	}
+	var tools []struct {
+		Type string `json:"type"`
+	}
+	if len(request.Tools) > 0 && common.Unmarshal(request.Tools, &tools) == nil {
+		for _, tool := range tools {
+			if tool.Type == "namespace" || tool.Type == "custom" {
+				return true
+			}
+		}
+	}
+	return false
 }

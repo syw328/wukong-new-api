@@ -80,7 +80,9 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 		return types.NewError(fmt.Errorf("invalid api type: %d", info.ApiType), types.ErrorCodeInvalidApiType, types.ErrOptionWithSkipRetry())
 	}
 	adaptor.Init(info)
-	if info.RelayMode == relayconstant.RelayModeResponses && channel.PlatformRelayChannel(info) {
+	platformRelay := info.RelayMode == relayconstant.RelayModeResponses && channel.PlatformRelayChannel(info)
+	nativeResponses := platformRelay && nativeResponsesClient(c, request)
+	if platformRelay && !nativeResponses {
 		usage, apiErr := platformResponsesViaChat(c, info, adaptor, request)
 		if apiErr != nil {
 			return apiErr
@@ -89,7 +91,7 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 		return nil
 	}
 	var requestBody io.Reader
-	if model_setting.GetGlobalSettings().PassThroughRequestEnabled || info.ChannelSetting.PassThroughBodyEnabled {
+	if model_setting.GetGlobalSettings().PassThroughRequestEnabled || info.ChannelSetting.PassThroughBodyEnabled || nativeResponses {
 		storage, err := common.GetBodyStorage(c)
 		if err != nil {
 			return types.NewError(err, types.ErrorCodeReadRequestBodyFailed, types.ErrOptionWithSkipRetry())

@@ -156,3 +156,26 @@ func mustJSON(t *testing.T, value any) string {
 	require.NoError(t, err)
 	return string(raw)
 }
+
+func TestNativeResponsesClientRecognisesCodexTurns(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	contextWithAgent := func(agent string) *gin.Context {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+		c.Request.Header.Set("User-Agent", agent)
+		return c
+	}
+	plain := &dto.OpenAIResponsesRequest{Model: "gpt-5.6-sol", Input: json.RawMessage(`"hi"`)}
+	assert.True(t, nativeResponsesClient(contextWithAgent("codex_cli_rs/0.154.0 (Mac OS 26.5.0; arm64)"), plain))
+	assert.False(t, nativeResponsesClient(contextWithAgent("OpenAI/Python 2.3.0"), plain), "ordinary clients keep the chat conversion")
+
+	sdk := contextWithAgent("OpenAI/Python 2.3.0")
+	assert.True(t, nativeResponsesClient(sdk, &dto.OpenAIResponsesRequest{Model: "gpt-5.6-sol",
+		ClientMetadata: json.RawMessage(`{"x-codex-turn-metadata":"{}","thread_id":"t"}`)}))
+	assert.True(t, nativeResponsesClient(sdk, &dto.OpenAIResponsesRequest{Model: "gpt-5.6-sol",
+		Input: json.RawMessage(`[{"type":"additional_tools","role":"developer","tools":[]},{"type":"message","role":"user","content":"hi"}]`)}))
+	assert.True(t, nativeResponsesClient(sdk, &dto.OpenAIResponsesRequest{Model: "gpt-5.6-sol",
+		Tools: json.RawMessage(`[{"type":"function","name":"shell"},{"type":"namespace","name":"mcp__docs"}]`)}))
+	assert.False(t, nativeResponsesClient(sdk, &dto.OpenAIResponsesRequest{Model: "gpt-5.6-sol",
+		Tools: json.RawMessage(`[{"type":"function","name":"lookup"}]`), ClientMetadata: json.RawMessage(`{"thread_id":"t"}`)}))
+}
