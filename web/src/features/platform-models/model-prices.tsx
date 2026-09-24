@@ -512,7 +512,14 @@ export function ModelPrices(props: { model: string }) {
           </section>
         ))}
       </div>
-      {!data.routes.length && !data.unavailable.length && (
+      {data.liveQuote && (
+        <p className='text-muted-foreground rounded-xl border p-6 text-sm'>
+          {t(
+            'Video HD is priced per video by duration, target resolution, frame rate and mode. Request /v1/media/quotes with your video to get the exact amount before creating the task; the final charge never exceeds that quote.'
+          )}
+        </p>
+      )}
+      {!data.liveQuote && !data.routes.length && !data.unavailable.length && (
         <p className='text-muted-foreground rounded-xl border p-6'>
           {t('No published route prices are available.')}
         </p>

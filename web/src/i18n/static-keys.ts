@@ -20,6 +20,11 @@ For commercial licensing, please contact support@quantumnous.com
 // These cover dynamic labels (e.g. constants, configs) that are passed into t at runtime.
 export const STATIC_I18N_KEYS = [
   // Platform marketplace facets and sort labels.
+  'AI tools',
+  'Quoted per video before each task',
+  'Use the OpenAI-compatible chat endpoint with the model ID below.',
+  'AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.',
+  'Images, video and audio use the platform asynchronous media API. Parameters match this model on the website; request a quote before each creation.',
   'All billing methods',
   'Billed per request',
   'Billed per token',

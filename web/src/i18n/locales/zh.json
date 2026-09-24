@@ -6622,6 +6622,10 @@
     "Billing method": "计费方式",
     "Billed per request": "按次计费",
     "Billed per token": "按 Token 计费",
-    "Specification": "规格"
+    "Specification": "规格",
+    "AI tools": "AI 工具",
+    "Quoted per video before each task": "按视频实时报价",
+    "Video HD is priced per video by duration, target resolution, frame rate and mode. Request /v1/media/quotes with your video to get the exact amount before creating the task; the final charge never exceeds that quote.": "视频高清按每个视频的时长、目标分辨率、帧率和处理模式实时计价。创建任务前用你的视频调用 /v1/media/quotes 获取本次确认价，最终扣费不会超过这个报价。",
+    "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.": "AI 工具使用同一套异步媒体 API：用公网链接（或之前任务的 ID）传入待处理的图片或视频，先获取报价再创建任务。价格与网站工具箱一致。"
   }
 }

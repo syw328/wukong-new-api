@@ -70,15 +70,26 @@ export function extractUsageOnComplete(ctx, result, raw) {
   if (data.billing && data.billing.state === "settled" && Number.isFinite(data.billing.charged) && data.billing.charged >= 0) return { platform_credits: data.billing.charged };
   return {};
 }
+// AI tools can return several files (masks, text); the platform lists them as result.outputs.
+function outputsOf(task) {
+  const data = task.state || task.data || {};
+  return data.result && Array.isArray(data.result.outputs) ? data.result.outputs.slice(0, 8) : [];
+}
 export function listArtifacts(task) {
   const data = task.data || {};
   if (String(task.status).toUpperCase() !== "SUCCESS") return [];
   const type = ["image", "video", "audio"].includes(data.modality) ? data.modality : "file";
-  return [{ key: "result", type: type }];
+  const outputs = outputsOf(task);
+  if (outputs.length < 2) return [{ key: "result", type: outputs[0] && outputs[0].kind === "text" ? "file" : type }];
+  return outputs.map(function(output, index) {
+    return { key: index ? "result-" + (index + 1) : "result", type: output.kind === "text" ? "file" : type };
+  });
 }
 export function buildContentRequest(ctx) {
-  if (ctx.artifactKey !== "result") throw new Error("artifact_not_found");
-  return { method: "GET", url: ctx.baseUrl.replace(/\/+$/, "") + "/v1/media/generations/" + encodeURIComponent(ctx.upstreamTaskId || ctx.taskId) + "/content",
+  const match = /^result(?:-([2-8]))?$/.exec(ctx.artifactKey || "");
+  if (!match) throw new Error("artifact_not_found");
+  const index = match[1] ? Number(match[1]) - 1 : 0;
+  return { method: "GET", url: ctx.baseUrl.replace(/\/+$/, "") + "/v1/media/generations/" + encodeURIComponent(ctx.upstreamTaskId || ctx.taskId) + "/content" + (index ? "?index=" + index : ""),
     headers: { Authorization: authorization(ctx) } };
 }
 function renderTask(ctx, task) {

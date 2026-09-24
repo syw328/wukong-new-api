@@ -1,5 +1,7 @@
 // Copyright (C) 2026 QuantumNous and contributors. AGPL-3.0-or-later.
 export type ModelType = 'chat' | 'image' | 'video' | 'audio'
+// AI tools (image processing, video HD) keep their media type but list as their own category.
+export type ModelCategory = ModelType | 'tool'
 export type Scalar = string | number | boolean | null
 export type ModelParameter = {
   name: string
@@ -24,6 +26,7 @@ export type PlatformModel = {
   endpoint: string
   quote_endpoint?: string
   vendor?: string
+  category?: 'tool'
   protocol?: string
   icon?: string
 }
@@ -64,17 +67,19 @@ export type PriceDetails = {
   audience: 'account' | 'site'
   currency: string
   unavailable: Array<{ id: string; provider: string; sku: string }>
+  liveQuote?: boolean
 }
 export type PriceSelections = Record<
   string,
   { variantIndex: number; values: Record<string, Scalar> }
 >
-export const TYPE_LABELS: Record<ModelType | 'all', string> = {
+export const TYPE_LABELS: Record<ModelCategory | 'all', string> = {
   all: 'All models',
   chat: 'Language models',
   image: 'Image models',
   video: 'Video models',
   audio: 'Audio models',
+  tool: 'AI tools',
 }
 
 export type BillingUnit = 'call' | 'tokens' | 'second' | 'characters'
@@ -97,6 +102,7 @@ export type ModelSummary = {
   successRate: number | null
   samples: number
   statisticsAvailable: boolean
+  liveQuote?: boolean
 }
 export type MarketSummaries = {
   summaries: Record<string, ModelSummary>
@@ -108,7 +114,7 @@ export type MarketSummaries = {
   validUntil: string
 }
 export type MarketFiltersValue = {
-  category: ModelType | 'all'
+  category: ModelCategory | 'all'
   vendor: string
   tag: string
   billing: string

@@ -69,6 +69,28 @@ func TestPlatformMediaNativeProtocol(t *testing.T) {
 		assert.Equal(t, "https://platform.test/v1/media/generations/act_1/content", content["url"])
 		assert.Equal(t, "Bearer test-only-key", decode(content["headers"])["Authorization"])
 	})
+	t.Run("AI tools expose every platform output as its own artifact", func(t *testing.T) {
+		artifacts := func(state map[string]any) []map[string]any {
+			value, callErr := plugin.Engine.Call(t.Context(), "listArtifacts", map[string]any{"status": "SUCCESS", "data": map[string]any{"modality": "image"}, "state": state})
+			require.NoError(t, callErr)
+			data, marshalErr := common.Marshal(value)
+			require.NoError(t, marshalErr)
+			var list []map[string]any
+			require.NoError(t, common.Unmarshal(data, &list))
+			return list
+		}
+		outputs := []any{map[string]any{"kind": "image"}, map[string]any{"kind": "image"}, map[string]any{"kind": "image"}}
+		list := artifacts(map[string]any{"id": "act_2", "status": "completed", "result": map[string]any{"outputs": outputs}})
+		require.Len(t, list, 3)
+		assert.Equal(t, []any{"result", "result-2", "result-3"}, []any{list[0]["key"], list[1]["key"], list[2]["key"]})
+		ocr := artifacts(map[string]any{"id": "act_3", "status": "completed", "result": map[string]any{"outputs": []any{map[string]any{"kind": "text"}}}})
+		assert.Equal(t, "file", ocr[0]["type"])
+		content := map[string]any{"baseUrl": "https://platform.test", "apiKey": "test-only-key", "authHeader": "test-only-key", "upstreamTaskId": "act_2", "artifactKey": "result-3"}
+		assert.Equal(t, "https://platform.test/v1/media/generations/act_2/content?index=2", invoke("buildContentRequest", content)["url"])
+		content["artifactKey"] = "result-9"
+		_, callErr := plugin.Engine.Call(t.Context(), "buildContentRequest", content)
+		require.Error(t, callErr)
+	})
 	t.Run("unknown or charged failure does not prematurely refund a request", func(t *testing.T) {
 		for _, state := range []map[string]any{
 			{"id": "act_1", "status": "unknown", "billing": map[string]any{"state": "pending"}},

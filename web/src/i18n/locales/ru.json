@@ -6520,6 +6520,10 @@
     "Default / options": "Default / options",
     "A timeout does not mean failure. Keep the request body and Idempotency-Key unchanged when recovering a submission; once a task ID is available, only poll that task. One request creates one output task.": "A timeout does not mean failure. Keep the request body and Idempotency-Key unchanged when recovering a submission; once a task ID is available, only poll that task. One request creates one output task.",
     "Use standard chat parameters. Model-specific parameters are not published.": "Use standard chat parameters. Model-specific parameters are not published.",
-    "Source code of this modified version": "Source code of this modified version"
+    "Source code of this modified version": "Source code of this modified version",
+    "AI tools": "AI tools",
+    "Quoted per video before each task": "Quoted per video before each task",
+    "Video HD is priced per video by duration, target resolution, frame rate and mode. Request /v1/media/quotes with your video to get the exact amount before creating the task; the final charge never exceeds that quote.": "Video HD is priced per video by duration, target resolution, frame rate and mode. Request /v1/media/quotes with your video to get the exact amount before creating the task; the final charge never exceeds that quote.",
+    "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.": "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox."
   }
 }

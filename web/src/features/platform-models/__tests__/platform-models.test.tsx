@@ -87,6 +87,22 @@ describe('complete platform model catalog', () => {
     })
     expect(request).not.toHaveProperty('provider')
   })
+  it('lists AI tools only under their own category and never adds a prompt to their example', () => {
+    const tool = {
+      ...models[1],
+      id: 'tool-image-enhance',
+      category: 'tool',
+      parameters: [
+        { name: 'image_url', label: 'Image', type: 'string', required: true },
+      ],
+    } as PlatformModel
+    expect(filterPlatformModels([...models, tool], 'tool', '')).toEqual([tool])
+    expect(filterPlatformModels([...models, tool], 'image', '')).toHaveLength(1)
+    expect(platformRequestExample(tool)).toEqual({
+      model: 'tool-image-enhance',
+      params: { image_url: '<image_url>' },
+    })
+  })
 })
 describe('account model price details', () => {
   it('shows zero success as zero, actual price and price-book validity', () => {
@@ -128,6 +144,18 @@ describe('account model price details', () => {
     fireEvent.click(screen.getByRole('button'))
     expect(retry).toHaveBeenCalledTimes(1)
   })
+})
+
+it('explains the per-video quote instead of an empty price list for video HD', () => {
+  mocks.prices.mockReturnValue({
+    data: { ...data(null), routes: [], liveQuote: true },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  })
+  render(<ModelPrices model='tool-video-enhance' />)
+  expect(screen.getByText(/priced per video/)).toBeTruthy()
+  expect(screen.queryByText('No published route prices are available.')).toBeNull()
 })
 
 it('formats project Chinese locale IDs without crashing the actual price page', () => {

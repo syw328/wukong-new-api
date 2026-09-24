@@ -20,7 +20,7 @@ import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
 
 import { BILLING_LABELS } from './constants'
-import { formatMarketAmount } from './helpers'
+import { formatMarketAmount, modelCategory } from './helpers'
 import { TYPE_LABELS, type ModelSummary, type PlatformModel } from './types'
 
 const ICONS = { chat: MessageSquare, image: Image, video: Video, audio: Music }
@@ -58,7 +58,11 @@ export function MarketPrice(props: {
     return (
       <div className='market-price-box'>
         <span className='text-muted-foreground text-sm'>
-          {t('Price temporarily unavailable')}
+          {t(
+            props.summary?.liveQuote
+              ? 'Quoted per video before each task'
+              : 'Price temporarily unavailable'
+          )}
         </span>
       </div>
     )
@@ -186,7 +190,7 @@ export const MarketCard = memo(function MarketCard(props: {
           </div>
         </div>
         <Badge variant='outline' className='market-type-badge'>
-          {t(TYPE_LABELS[model.type])}
+          {t(TYPE_LABELS[modelCategory(model)])}
         </Badge>
       </div>
       <div className='market-card-price'>

@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { MarketMetrics, MarketModelIcon, MarketPrice } from './market-card'
 import { ModelApi } from './model-api'
 import { ModelPrices } from './model-prices'
+import { modelCategory } from './helpers'
 import { TYPE_LABELS, type ModelSummary, type PlatformModel } from './types'
 
 export function ModelDetailsDialog(props: {
@@ -54,7 +55,9 @@ export function ModelDetailsDialog(props: {
           <div className='market-detail-intro'>
             <div className='min-w-0 space-y-3'>
               <div className='flex flex-wrap items-center gap-2'>
-                <Badge variant='outline'>{t(TYPE_LABELS[model.type])}</Badge>
+                <Badge variant='outline'>
+                  {t(TYPE_LABELS[modelCategory(model)])}
+                </Badge>
                 {model.tags.slice(0, 8).map((tag) => (
                   <Badge key={tag} variant='secondary'>
                     {t(tag)}

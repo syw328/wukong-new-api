@@ -1,16 +1,20 @@
 // Copyright (C) 2026 QuantumNous and contributors. AGPL-3.0-or-later.
 import type {
   PlatformModel,
-  ModelType,
+  ModelCategory,
   ModelSummary,
   MarketFiltersValue,
   MarketSort,
   PriceRoute,
 } from './types'
 
+export function modelCategory(model: PlatformModel): ModelCategory {
+  return model.category || model.type
+}
+
 export function filterPlatformModels(
   models: PlatformModel[],
-  type: ModelType | 'all',
+  type: ModelCategory | 'all',
   search: string,
   filters: Partial<MarketFiltersValue> = {},
   summaries: Record<string, ModelSummary> = {}
@@ -18,7 +22,7 @@ export function filterPlatformModels(
   const text = search.trim().toLowerCase()
   return models.filter(
     (model) =>
-      (type === 'all' || model.type === type) &&
+      (type === 'all' || modelCategory(model) === type) &&
       (!filters.vendor ||
         filters.vendor === 'all' ||
         (model.vendor || 'Other') === filters.vendor) &&
@@ -48,6 +52,8 @@ export function platformRequestExample(
         : `<${field.name}>`
     }
   }
+  // AI tools take their source by URL; only the ones that describe a scene publish a prompt parameter.
+  if (model.category === 'tool') return { model: model.id, params }
   return {
     model: model.id,
     prompt: 'A clean, softly lit product scene',
