@@ -6524,6 +6524,12 @@
     "AI tools": "AI tools",
     "Quoted per video before each task": "Quoted per video before each task",
     "Video HD is priced per video by duration, target resolution, frame rate and mode. Request /v1/media/quotes with your video to get the exact amount before creating the task; the final charge never exceeds that quote.": "Video HD is priced per video by duration, target resolution, frame rate and mode. Request /v1/media/quotes with your video to get the exact amount before creating the task; the final charge never exceeds that quote.",
-    "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.": "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox."
+    "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.": "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.",
+    "This API key is invalid, disabled or expired. Select an active key and import again.": "此 API 金鑰無效、已停用或已過期，請選擇有效金鑰重新匯入。",
+    "Unable to verify this API key. Please retry.": "暫時無法驗證此 API 金鑰，請重試。",
+    "Please select an active API key": "請選擇有效的 API 金鑰",
+    "Verifying API key and available models...": "正在驗證金鑰與可用模型…",
+    "No compatible models are available for this application and API key.": "目前金鑰沒有適用於此應用程式的模型。",
+    "After importing on your computer, enable this provider in CC Switch. Re-import after replacing an API key.": "請在電腦匯入後，在 CC Switch 中啟用此供應商。更換金鑰後需要重新匯入。"
   }
 }

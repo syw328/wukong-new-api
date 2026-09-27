@@ -6524,6 +6524,12 @@
     "AI tools": "AI tools",
     "Quoted per video before each task": "Quoted per video before each task",
     "Video HD is priced per video by duration, target resolution, frame rate and mode. Request /v1/media/quotes with your video to get the exact amount before creating the task; the final charge never exceeds that quote.": "Video HD is priced per video by duration, target resolution, frame rate and mode. Request /v1/media/quotes with your video to get the exact amount before creating the task; the final charge never exceeds that quote.",
-    "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.": "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox."
+    "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.": "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.",
+    "This API key is invalid, disabled or expired. Select an active key and import again.": "Cette clé API est invalide, désactivée ou expirée. Sélectionnez une clé active et importez-la à nouveau.",
+    "Unable to verify this API key. Please retry.": "Impossible de vérifier cette clé API. Réessayez.",
+    "Please select an active API key": "Sélectionnez une clé API active",
+    "Verifying API key and available models...": "Vérification de la clé API et des modèles disponibles…",
+    "No compatible models are available for this application and API key.": "Aucun modèle compatible avec cette application et cette clé API.",
+    "After importing on your computer, enable this provider in CC Switch. Re-import after replacing an API key.": "Après l’importation sur votre ordinateur, activez ce fournisseur dans CC Switch. Réimportez après avoir remplacé la clé API."
   }
 }

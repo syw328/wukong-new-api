@@ -22,13 +22,18 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Dialog } from '@/components/dialog'
+import { ErrorState } from '@/components/error-state'
+import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
 import { ComboboxInput } from '@/components/ui/combobox-input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { getUserModels } from '@/lib/api'
-import { portalLocalStorage } from '@/lib/portal-runtime'
-import { requireServerSuccess } from '@/lib/server-error-message'
+
+import {
+  buildCCSwitchURL,
+  ccSwitchServerAddress,
+  loadCCSwitchModels,
+} from '../../lib/cc-switch'
 
 const APP_CONFIGS = {
   claude: {
@@ -55,44 +60,10 @@ const APP_CONFIGS = {
 
 type AppType = keyof typeof APP_CONFIGS
 
-function getServerAddress(): string {
-  try {
-    const raw = portalLocalStorage.getItem('status')
-    if (raw) {
-      const status = JSON.parse(raw)
-      if (status.server_address) return status.server_address
-    }
-  } catch {
-    /* empty */
-  }
-  return window.location.origin
-}
-
-function buildCCSwitchURL(
-  app: string,
-  name: string,
-  models: Record<string, string>,
-  apiKey: string
-): string {
-  const serverAddress = getServerAddress()
-  const endpoint = app === 'codex' ? `${serverAddress}/v1` : serverAddress
-  const params = new URLSearchParams()
-  params.set('resource', 'provider')
-  params.set('app', app)
-  params.set('name', name)
-  params.set('endpoint', endpoint)
-  params.set('apiKey', apiKey)
-  for (const [k, v] of Object.entries(models)) {
-    if (v) params.set(k, v)
-  }
-  params.set('homepage', serverAddress)
-  params.set('enabled', 'true')
-  return `ccswitch://v1/import?${params.toString()}`
-}
-
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
+  tokenId: number
   tokenKey: string
 }
 
@@ -102,17 +73,31 @@ export function CCSwitchDialog(props: Props) {
   const [name, setName] = useState<string>(APP_CONFIGS.claude.defaultName)
   const [models, setModels] = useState<Record<string, string>>({})
 
-  const { data: modelsData } = useQuery({
-    queryKey: ['user-models-ccswitch'],
-    queryFn: async () => requireServerSuccess(await getUserModels()),
-    enabled: props.open,
-    staleTime: 5 * 60 * 1000,
+  const modelQuery = useQuery({
+    queryKey: ['ccswitch-models', props.tokenId],
+    queryFn: ({ signal }) => loadCCSwitchModels(props.tokenKey, signal),
+    enabled: props.open && Boolean(props.tokenKey),
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+    meta: { errorToast: false },
   })
 
-  const modelOptions = useMemo(() => {
-    const items = modelsData?.data ?? []
-    return items.map((m) => ({ value: m, label: m }))
-  }, [modelsData?.data])
+  const modelOptions = useMemo(
+    () =>
+      (modelQuery.data ?? [])
+        .filter((model) => model.apps.includes(app))
+        .map((model) => ({ value: model.id, label: model.id })),
+    [modelQuery.data, app]
+  )
+  const canImport =
+    modelQuery.isSuccess &&
+    !modelQuery.isFetching &&
+    Boolean(models.model) &&
+    Boolean(name.trim()) &&
+    Object.values(models)
+      .filter(Boolean)
+      .every((model) => modelOptions.some((option) => option.value === model))
 
   useEffect(() => {
     if (props.open) {
@@ -139,10 +124,8 @@ export function CCSwitchDialog(props: Props) {
       toast.warning(t('Please select a primary model'))
       return
     }
-    const key = props.tokenKey.startsWith('sk-')
-      ? props.tokenKey
-      : `sk-${props.tokenKey}`
-    const url = buildCCSwitchURL(app, name, models, key)
+    if (!canImport) return
+    const url = buildCCSwitchURL(app, name.trim(), models, props.tokenKey)
     window.open(url, '_blank')
     props.onOpenChange(false)
   }
@@ -162,11 +145,17 @@ export function CCSwitchDialog(props: Props) {
           <Button variant='outline' onClick={() => props.onOpenChange(false)}>
             {t('Cancel')}
           </Button>
-          <Button onClick={handleSubmit}>{t('Open CC Switch')}</Button>
+          <Button onClick={handleSubmit} disabled={!canImport}>
+            {t('Open CC Switch')}
+          </Button>
         </>
       }
     >
       <div className='space-y-4'>
+        <div className='text-muted-foreground text-sm break-all'>
+          {t('API Endpoint')}: {ccSwitchServerAddress()}
+          {app === 'codex' ? '/v1' : ''}
+        </div>
         <div className='space-y-2'>
           <Label>{t('Application')}</Label>
           <RadioGroup
@@ -191,8 +180,9 @@ export function CCSwitchDialog(props: Props) {
         </div>
 
         <div className='space-y-2'>
-          <Label>{t('Name')}</Label>
+          <Label htmlFor='cc-switch-name'>{t('Name')}</Label>
           <ComboboxInput
+            id='cc-switch-name'
             options={[]}
             value={name}
             onValueChange={setName}
@@ -202,10 +192,37 @@ export function CCSwitchDialog(props: Props) {
           />
         </div>
 
+        {modelQuery.isFetching && (
+          <LoadingState
+            inline
+            message={t('Verifying API key and available models...')}
+          />
+        )}
+        {modelQuery.isError && (
+          <ErrorState
+            className='min-h-0'
+            description={t(modelQuery.error.message)}
+            onRetry={() => {
+              void modelQuery.refetch()
+            }}
+          />
+        )}
+        {modelQuery.isSuccess &&
+          !modelQuery.isFetching &&
+          modelOptions.length === 0 && (
+            <p className='text-muted-foreground text-sm'>
+              {t(
+                'No compatible models are available for this application and API key.'
+              )}
+            </p>
+          )}
         {currentConfig.modelFields.map((field) => (
           <div key={field.key} className='space-y-2'>
-            <Label required={field.required}>{t(field.labelKey)}</Label>
+            <Label htmlFor={`cc-switch-${field.key}`} required={field.required}>
+              {t(field.labelKey)}
+            </Label>
             <ComboboxInput
+              id={`cc-switch-${field.key}`}
               options={modelOptions}
               value={models[field.key] || ''}
               onValueChange={(v) =>
@@ -216,6 +233,11 @@ export function CCSwitchDialog(props: Props) {
             />
           </div>
         ))}
+        <p className='text-muted-foreground text-sm'>
+          {t(
+            'After importing on your computer, enable this provider in CC Switch. Re-import after replacing an API key.'
+          )}
+        </p>
       </div>
     </Dialog>
   )

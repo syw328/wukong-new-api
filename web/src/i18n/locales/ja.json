@@ -6524,6 +6524,12 @@
     "AI tools": "AI tools",
     "Quoted per video before each task": "Quoted per video before each task",
     "Video HD is priced per video by duration, target resolution, frame rate and mode. Request /v1/media/quotes with your video to get the exact amount before creating the task; the final charge never exceeds that quote.": "Video HD is priced per video by duration, target resolution, frame rate and mode. Request /v1/media/quotes with your video to get the exact amount before creating the task; the final charge never exceeds that quote.",
-    "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.": "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox."
+    "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.": "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.",
+    "This API key is invalid, disabled or expired. Select an active key and import again.": "この API キーは無効、停止中、または期限切れです。有効なキーを選択して再インポートしてください。",
+    "Unable to verify this API key. Please retry.": "この API キーを確認できません。再試行してください。",
+    "Please select an active API key": "有効な API キーを選択してください",
+    "Verifying API key and available models...": "API キーと利用可能なモデルを確認中…",
+    "No compatible models are available for this application and API key.": "このアプリと API キーに対応するモデルがありません。",
+    "After importing on your computer, enable this provider in CC Switch. Re-import after replacing an API key.": "パソコンでインポート後、CC Switch でこのプロバイダーを有効にしてください。API キーを変更した場合は再インポートしてください。"
   }
 }

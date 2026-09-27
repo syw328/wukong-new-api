@@ -27,6 +27,7 @@ export type PlatformModel = {
   quote_endpoint?: string
   vendor?: string
   category?: 'tool'
+  client_apps?: string[]
   protocol?: string
   icon?: string
 }

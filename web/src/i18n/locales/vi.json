@@ -6524,6 +6524,12 @@
     "AI tools": "AI tools",
     "Quoted per video before each task": "Quoted per video before each task",
     "Video HD is priced per video by duration, target resolution, frame rate and mode. Request /v1/media/quotes with your video to get the exact amount before creating the task; the final charge never exceeds that quote.": "Video HD is priced per video by duration, target resolution, frame rate and mode. Request /v1/media/quotes with your video to get the exact amount before creating the task; the final charge never exceeds that quote.",
-    "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.": "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox."
+    "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.": "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.",
+    "This API key is invalid, disabled or expired. Select an active key and import again.": "Khóa API này không hợp lệ, bị tắt hoặc hết hạn. Hãy chọn khóa đang hoạt động và nhập lại.",
+    "Unable to verify this API key. Please retry.": "Không thể xác minh khóa API này. Vui lòng thử lại.",
+    "Please select an active API key": "Vui lòng chọn khóa API đang hoạt động",
+    "Verifying API key and available models...": "Đang xác minh khóa API và các mô hình khả dụng…",
+    "No compatible models are available for this application and API key.": "Không có mô hình tương thích với ứng dụng và khóa API này.",
+    "After importing on your computer, enable this provider in CC Switch. Re-import after replacing an API key.": "Sau khi nhập trên máy tính, hãy bật nhà cung cấp này trong CC Switch. Nhập lại sau khi thay khóa API."
   }
 }

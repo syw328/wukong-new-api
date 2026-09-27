@@ -441,6 +441,12 @@ export const STATIC_I18N_KEYS = [
   'Monthly',
 
   // CC Switch dialog
+  'This API key is invalid, disabled or expired. Select an active key and import again.',
+  'Unable to verify this API key. Please retry.',
+  'Please select an active API key',
+  'Verifying API key and available models...',
+  'No compatible models are available for this application and API key.',
+  'After importing on your computer, enable this provider in CC Switch. Re-import after replacing an API key.',
   'Import to CC Switch',
   'Open CC Switch',
   'Primary Model',

@@ -6524,6 +6524,12 @@
     "AI tools": "AI tools",
     "Quoted per video before each task": "Quoted per video before each task",
     "Video HD is priced per video by duration, target resolution, frame rate and mode. Request /v1/media/quotes with your video to get the exact amount before creating the task; the final charge never exceeds that quote.": "Video HD is priced per video by duration, target resolution, frame rate and mode. Request /v1/media/quotes with your video to get the exact amount before creating the task; the final charge never exceeds that quote.",
-    "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.": "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox."
+    "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.": "AI tools use the same asynchronous media API: pass the source image or video as a public URL (or the ID of an earlier task), request a quote, then create the task. Prices match the website toolbox.",
+    "This API key is invalid, disabled or expired. Select an active key and import again.": "Ключ API недействителен, отключён или просрочен. Выберите активный ключ и импортируйте заново.",
+    "Unable to verify this API key. Please retry.": "Не удалось проверить ключ API. Повторите попытку.",
+    "Please select an active API key": "Выберите активный ключ API",
+    "Verifying API key and available models...": "Проверка ключа API и доступных моделей…",
+    "No compatible models are available for this application and API key.": "Для этого приложения и ключа API нет совместимых моделей.",
+    "After importing on your computer, enable this provider in CC Switch. Re-import after replacing an API key.": "После импорта на компьютере включите этого провайдера в CC Switch. После замены ключа API выполните импорт заново."
   }
 }

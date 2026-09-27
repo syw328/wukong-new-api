@@ -53,25 +53,12 @@ import { sendToFluent } from '@/features/chat/lib/send-to-fluent'
 import { encodeChannelConnectionInfo } from '@/lib/channel-connection-info'
 import { copyToClipboard } from '@/lib/copy-to-clipboard'
 import { handleServerError } from '@/lib/handle-server-error'
-import { portalLocalStorage } from '@/lib/portal-runtime'
 
 import { updateApiKeyStatus } from '../api'
 import { API_KEY_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants'
+import { ccSwitchServerAddress } from '../lib/cc-switch'
 import { apiKeySchema } from '../types'
 import { useApiKeys } from './api-keys-provider'
-
-function getServerAddress(): string {
-  try {
-    const raw = portalLocalStorage.getItem('status')
-    if (raw) {
-      const status = JSON.parse(raw)
-      if (status.server_address) return status.server_address as string
-    }
-  } catch {
-    /* empty */
-  }
-  return window.location.origin
-}
 
 type DataTableRowActionsProps<TData> = {
   row: Row<TData>
@@ -242,7 +229,7 @@ export function DataTableRowActions<TData>({
             if (!realKey) return
             const connStr = encodeChannelConnectionInfo(
               realKey,
-              getServerAddress()
+              ccSwitchServerAddress()
             )
             const ok = await copyToClipboard(connStr)
             if (ok) toast.success(t('Copied'))
