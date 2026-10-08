@@ -361,6 +361,8 @@
 .market-view-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
+/* The type badge straddles the top edge; Card's overflow-hidden would clip it.
+   The footer rounds its own bottom corners. */
 .market-card {
   position: relative;
   isolation: isolate;
@@ -368,6 +370,7 @@
   flex-direction: column;
   gap: 14px;
   min-width: 0;
+  overflow: visible;
   padding: 18px 16px 0;
   border: 1px solid var(--market-edge);
   border-radius: 20px;
