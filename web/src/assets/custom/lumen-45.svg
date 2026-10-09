@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="流光 45">
+  <defs><linearGradient id="light" x1="10" y1="16" x2="84" y2="80" gradientUnits="userSpaceOnUse"><stop stop-color="#6ef5d0"/><stop offset=".5" stop-color="#68beff"/><stop offset="1" stop-color="#7868ff"/></linearGradient></defs>
+  <path d="M66 15C50 5 23 12 13 31s-5 42 13 51c15 8 35 4 47-8" fill="none" stroke="url(#light)" stroke-width="10" stroke-linecap="round"/>
+  <path d="M73 29C65 15 43 14 29 25" fill="none" stroke="url(#light)" stroke-width="6" stroke-linecap="round" opacity=".65"/>
+  <path d="M41 29c-2-1-5 0-5 3v32c0 3 3 4 5 3l26-16c3-2 3-4 0-6z" fill="url(#light)"/>
+  <circle cx="80" cy="19" r="5" fill="#6ef5d0"/>
+</svg>
