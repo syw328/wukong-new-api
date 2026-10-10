@@ -1,11 +1,11 @@
 {
   "translation": {
-    "Recharge on the main site": "請前往主站儲值",
-    "Go to main site to recharge": "前往主站儲值",
-    "Opens the main site in a new tab. You can return to this API page after recharging.": "將在新分頁開啟主站。儲值後可返回目前的 API 頁面。",
     "360": "360",
     "1000": "1000",
     "10000": "10000",
+    "Recharge on the main site": "請前往主站儲值",
+    "Go to main site to recharge": "前往主站儲值",
+    "Opens the main site in a new tab. You can return to this API page after recharging.": "將在新分頁開啟主站。儲值後可返回目前的 API 頁面。",
     "_copy": "_複製",
     "，": "，",
     ", and": "，和",
@@ -6533,6 +6533,17 @@
     "Please select an active API key": "請選擇有效的 API 金鑰",
     "Verifying API key and available models...": "正在驗證金鑰與可用模型…",
     "No compatible models are available for this application and API key.": "目前金鑰沒有適用於此應用程式的模型。",
-    "After importing on your computer, enable this provider in CC Switch. Re-import after replacing an API key.": "請在電腦匯入後，在 CC Switch 中啟用此供應商。更換金鑰後需要重新匯入。"
+    "After importing on your computer, enable this provider in CC Switch. Re-import after replacing an API key.": "請在電腦匯入後，在 CC Switch 中啟用此供應商。更換金鑰後需要重新匯入。",
+    "Generation route": "生成線路",
+    "Set route_id at the top level of both requests. The model ID stays the same. An explicit route never switches to another route; omit route_id for automatic selection.": "報價和建立請求都在頂層傳入 route_id，model 保持不變。指定線路後不會自動換線；不傳 route_id 時自動選線。",
+    "Loading routes…": "正在載入線路…",
+    "Unable to load routes. Refresh before copying an explicit route example.": "線路載入失敗，請重新整理後再複製指定線路的範例。",
+    "Automatic selection (omit route_id)": "自動選線（不傳 route_id）",
+    "This route is no longer available. Select a current route and request a new quote.": "該線路已無法使用，請選擇目前線路並重新報價。",
+    "Copy route ID": "複製線路 ID",
+    "No priced routes are currently available.": "目前沒有已核價線路。",
+    "Selecting a route updates the examples and parameter table below. Use a fresh quote after changing any parameter or route.": "選擇線路後，下方範例和參數表會同步更新。修改任何參數或線路後，需要重新取得報價。",
+    "Copy request example": "複製請求範例",
+    "cURL example": "cURL 範例"
   }
 }

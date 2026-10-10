@@ -6635,6 +6635,17 @@
     "Please select an active API key": "请选择有效的 API 密钥",
     "Verifying API key and available models...": "正在验证密钥和可用模型…",
     "No compatible models are available for this application and API key.": "当前密钥没有适用于此应用的模型。",
-    "After importing on your computer, enable this provider in CC Switch. Re-import after replacing an API key.": "请在电脑上导入后，在 CC Switch 中启用此供应商。更换密钥后需要重新导入。"
+    "After importing on your computer, enable this provider in CC Switch. Re-import after replacing an API key.": "请在电脑上导入后，在 CC Switch 中启用此供应商。更换密钥后需要重新导入。",
+    "Generation route": "生成线路",
+    "Set route_id at the top level of both requests. The model ID stays the same. An explicit route never switches to another route; omit route_id for automatic selection.": "报价和创建请求都在顶层传入 route_id，model 保持不变。指定线路后不会自动换线；不传 route_id 时自动选线。",
+    "Loading routes…": "正在加载线路…",
+    "Unable to load routes. Refresh before copying an explicit route example.": "线路加载失败，请刷新后再复制指定线路的示例。",
+    "Automatic selection (omit route_id)": "自动选线（不传 route_id）",
+    "This route is no longer available. Select a current route and request a new quote.": "该线路已不可用，请选择当前线路并重新报价。",
+    "Copy route ID": "复制线路 ID",
+    "No priced routes are currently available.": "当前没有已核价线路。",
+    "Selecting a route updates the examples and parameter table below. Use a fresh quote after changing any parameter or route.": "选择线路后，下方示例和参数表会同步更新。修改任意参数或线路后，需要重新获取报价。",
+    "Copy request example": "复制请求示例",
+    "cURL example": "cURL 示例"
   }
 }

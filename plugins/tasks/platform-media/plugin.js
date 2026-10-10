@@ -27,6 +27,7 @@ function request(ctx) {
   if (typeof input.authorization_max !== "number" || !Number.isFinite(input.authorization_max) || input.authorization_max <= 0 || input.authorization_max > 1000000) throw new Error("confirmed_quote_required");
   if (typeof input.authorization_token !== "string" || input.authorization_token.length > 3000 || !input.confirmed_price_book_id) throw new Error("confirmed_quote_required");
   return { model: model, prompt: input.prompt || "", params: input.params || {},
+    ...(input.route_id !== undefined ? { route_id: input.route_id } : {}),
     authorization_token: input.authorization_token, authorization_max: input.authorization_max,
     confirmed_price_book_id: input.confirmed_price_book_id };
 }

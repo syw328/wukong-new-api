@@ -6533,6 +6533,17 @@
     "Please select an active API key": "Sélectionnez une clé API active",
     "Verifying API key and available models...": "Vérification de la clé API et des modèles disponibles…",
     "No compatible models are available for this application and API key.": "Aucun modèle compatible avec cette application et cette clé API.",
-    "After importing on your computer, enable this provider in CC Switch. Re-import after replacing an API key.": "Après l’importation sur votre ordinateur, activez ce fournisseur dans CC Switch. Réimportez après avoir remplacé la clé API."
+    "After importing on your computer, enable this provider in CC Switch. Re-import after replacing an API key.": "Après l’importation sur votre ordinateur, activez ce fournisseur dans CC Switch. Réimportez après avoir remplacé la clé API.",
+    "Generation route": "Generation route",
+    "Set route_id at the top level of both requests. The model ID stays the same. An explicit route never switches to another route; omit route_id for automatic selection.": "Set route_id at the top level of both requests. The model ID stays the same. An explicit route never switches to another route; omit route_id for automatic selection.",
+    "Loading routes…": "Loading routes…",
+    "Unable to load routes. Refresh before copying an explicit route example.": "Unable to load routes. Refresh before copying an explicit route example.",
+    "Automatic selection (omit route_id)": "Automatic selection (omit route_id)",
+    "This route is no longer available. Select a current route and request a new quote.": "This route is no longer available. Select a current route and request a new quote.",
+    "Copy route ID": "Copy route ID",
+    "No priced routes are currently available.": "No priced routes are currently available.",
+    "Selecting a route updates the examples and parameter table below. Use a fresh quote after changing any parameter or route.": "Selecting a route updates the examples and parameter table below. Use a fresh quote after changing any parameter or route.",
+    "Copy request example": "Copy request example",
+    "cURL example": "cURL example"
   }
 }

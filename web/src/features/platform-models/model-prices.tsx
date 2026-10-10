@@ -183,6 +183,18 @@ function RouteCard(props: {
           ].join('\n')}
         />
       </header>
+      {props.type !== 'chat' && route.parameters && (
+        <div className='flex min-w-0 items-center gap-2 border-b px-5 py-3'>
+          <code className='min-w-0 flex-1 text-xs break-all'>
+            route_id: {route.id}
+          </code>
+          <CopyButton
+            value={route.id}
+            size='sm'
+            aria-label={t('Copy route ID')}
+          />
+        </div>
+      )}
       {route.variants.length > 1 && (
         <div
           className='flex flex-wrap gap-2 border-b p-4'

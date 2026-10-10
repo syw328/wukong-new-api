@@ -64,6 +64,27 @@ function data(rate: number | null): PriceDetails {
   }
 }
 describe('complete platform model catalog', () => {
+  it('uses the selected route ID and its own parameter defaults in both media requests', () => {
+    const selected = {
+      ...data(null).routes[0],
+      id: '94ab67158fe5abd515c6b792',
+      parameters: [
+        { name: 'duration', label: 'Duration', type: 'number', default: 4 },
+        {
+          name: 'resolution',
+          label: 'Resolution',
+          type: 'select',
+          default: '480p',
+        },
+      ],
+    }
+    const request = platformRequestExample(models[2], selected)
+    expect(request).toMatchObject({
+      route_id: selected.id,
+      params: { duration: 4, resolution: '480p' },
+    })
+    expect(request).not.toHaveProperty('provider')
+  })
   it('keeps every modality searchable by model ID and applies independent categories', () => {
     expect(filterPlatformModels(models, 'all', '')).toHaveLength(4)
     expect(filterPlatformModels(models, 'audio', '')[0].id).toBe('test-audio')
@@ -155,7 +176,9 @@ it('explains the per-video quote instead of an empty price list for video HD', (
   })
   render(<ModelPrices model='tool-video-enhance' />)
   expect(screen.getByText(/priced per video/)).toBeTruthy()
-  expect(screen.queryByText('No published route prices are available.')).toBeNull()
+  expect(
+    screen.queryByText('No published route prices are available.')
+  ).toBeNull()
 })
 
 it('formats project Chinese locale IDs without crashing the actual price page', () => {

@@ -13,7 +13,7 @@ export type ModelParameter = {
   max?: number
   step?: number
   default?: Scalar
-  options?: Array<{ value: Scalar; label: string }>
+  options?: Array<{ value: Scalar; label: string; is_default?: boolean }>
 }
 export type PlatformModel = {
   id: string
@@ -45,6 +45,7 @@ export type PriceRoute = {
   id: string
   provider: string
   sku: string
+  parameters?: ModelParameter[]
   variantIndex: number
   variants: Array<{
     index: number

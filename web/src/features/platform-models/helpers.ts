@@ -41,12 +41,26 @@ export function filterPlatformModels(
 }
 
 export function platformRequestExample(
-  model: PlatformModel
+  model: PlatformModel,
+  route?: PriceRoute
 ): Record<string, unknown> {
   const params: Record<string, unknown> = {}
-  for (const field of model.parameters) {
-    if (field.default != null) params[field.name] = field.default
-    else if (field.required) {
+  for (const field of route?.parameters || model.parameters) {
+    const value =
+      field.default ?? field.options?.find((option) => option.is_default)?.value
+    if (value != null) params[field.name] = value
+    else if (field.required && field.options?.length) {
+      params[field.name] = field.options[0].value
+    } else if (field.required && field.type === 'upload') {
+      const url = 'https://example.com/replace-with-your-reference.png'
+      params[field.name] =
+        Number(field.max) > 1 ||
+        ['images', 'videos', 'audios', 'clips', 'reference_urls'].includes(
+          field.name
+        )
+          ? [url]
+          : url
+    } else if (field.required) {
       params[field.name] = field.type.includes('multi')
         ? ['https://example.com/reference.png']
         : `<${field.name}>`
@@ -56,6 +70,7 @@ export function platformRequestExample(
   if (model.category === 'tool') return { model: model.id, params }
   return {
     model: model.id,
+    ...(route ? { route_id: route.id } : {}),
     prompt: 'A clean, softly lit product scene',
     params,
   }
