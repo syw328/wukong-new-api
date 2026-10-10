@@ -1,5 +1,8 @@
 {
   "translation": {
+    "Recharge on the main site": "Nạp tiền trên trang chính",
+    "Go to main site to recharge": "Đến trang chính để nạp tiền",
+    "Opens the main site in a new tab. You can return to this API page after recharging.": "Trang chính sẽ mở trong tab mới. Bạn có thể quay lại trang API này sau khi nạp tiền.",
     "360": "360",
     "1000": "1000",
     "10000": "10000",

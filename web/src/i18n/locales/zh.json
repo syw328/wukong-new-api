@@ -1,5 +1,8 @@
 {
   "translation": {
+    "Recharge on the main site": "请前往主站充值",
+    "Go to main site to recharge": "前往主站充值",
+    "Opens the main site in a new tab. You can return to this API page after recharging.": "将在新标签页打开主站。充值后可返回当前 API 页面。",
     "360": "360",
     "1000": "1000",
     "10000": "10000",

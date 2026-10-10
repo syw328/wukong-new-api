@@ -1,5 +1,8 @@
 {
   "translation": {
+    "Recharge on the main site": "Rechargez sur le site principal",
+    "Go to main site to recharge": "Aller au site principal pour recharger",
+    "Opens the main site in a new tab. You can return to this API page after recharging.": "Le site principal s’ouvre dans un nouvel onglet. Vous pouvez revenir à cette page API après la recharge.",
     "360": "360",
     "1000": "1000",
     "10000": "10000",

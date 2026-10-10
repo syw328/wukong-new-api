@@ -35,6 +35,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { formatNumber } from '@/lib/format'
+import { portalRuntime } from '@/lib/portal-runtime'
 import { cn } from '@/lib/utils'
 
 import {
@@ -142,6 +143,8 @@ export function RechargeFormCard({
     Array.isArray(waffoPayMethods) && waffoPayMethods.length > 0
   const minTopup = getMinTopupAmount(topupInfo)
   const redemptionEnabled = topupInfo?.enable_redemption !== false
+  const portal = portalRuntime()
+  const mainSiteUrl = portal.basePath ? `${portal.origin}/` : null
 
   if (loading) {
     return (
@@ -197,7 +200,11 @@ export function RechargeFormCard({
   return (
     <TitledCard
       title={t('Add Funds')}
-      description={t('Choose an amount and payment method')}
+      description={
+        mainSiteUrl
+          ? t('Recharge on the main site')
+          : t('Choose an amount and payment method')
+      }
       icon={<WalletCards className='h-4 w-4' />}
       iconTone='success'
       disableHoverEffect
@@ -216,6 +223,28 @@ export function RechargeFormCard({
       }
       contentClassName='space-y-4 sm:space-y-6'
     >
+      {mainSiteUrl && (
+        <Alert className='flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between'>
+          <AlertDescription className='min-w-0'>
+            {t(
+              'Opens the main site in a new tab. You can return to this API page after recharging.'
+            )}
+          </AlertDescription>
+          <Button
+            size='lg'
+            role='link'
+            className='w-full sm:w-auto'
+            nativeButton={false}
+            render={
+              <a href={mainSiteUrl} target='_blank' rel='noopener noreferrer' />
+            }
+          >
+            {t('Go to main site to recharge')}
+            <ExternalLink aria-hidden='true' data-icon='inline-end' />
+          </Button>
+        </Alert>
+      )}
+
       {/* Online Topup Section */}
       {hasAnyTopup ? (
         <div className='space-y-4 sm:space-y-6'>
@@ -478,13 +507,15 @@ export function RechargeFormCard({
           )}
         </div>
       ) : (
-        <Alert>
-          <AlertDescription>
-            {t(
-              'Online topup is not enabled. Please use redemption code or contact administrator.'
-            )}
-          </AlertDescription>
-        </Alert>
+        !mainSiteUrl && (
+          <Alert>
+            <AlertDescription>
+              {t(
+                'Online topup is not enabled. Please use redemption code or contact administrator.'
+              )}
+            </AlertDescription>
+          </Alert>
+        )
       )}
 
       {/* Creem Products Section */}
@@ -551,13 +582,15 @@ export function RechargeFormCard({
           )}
         </div>
       ) : (
-        <Alert className='border-t'>
-          <AlertDescription>
-            {t(
-              'Redemption codes are disabled until the administrator confirms compliance terms.'
-            )}
-          </AlertDescription>
-        </Alert>
+        !mainSiteUrl && (
+          <Alert className='border-t'>
+            <AlertDescription>
+              {t(
+                'Redemption codes are disabled until the administrator confirms compliance terms.'
+              )}
+            </AlertDescription>
+          </Alert>
+        )
       )}
     </TitledCard>
   )

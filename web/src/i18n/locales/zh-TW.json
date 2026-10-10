@@ -1,5 +1,8 @@
 {
   "translation": {
+    "Recharge on the main site": "請前往主站儲值",
+    "Go to main site to recharge": "前往主站儲值",
+    "Opens the main site in a new tab. You can return to this API page after recharging.": "將在新分頁開啟主站。儲值後可返回目前的 API 頁面。",
     "360": "360",
     "1000": "1000",
     "10000": "10000",
