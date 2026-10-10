@@ -168,6 +168,13 @@ func memoryRateLimitHandler(duration int64, totalMaxCount, successMaxCount int) 
 // ModelRequestRateLimit 模型请求限流中间件
 func ModelRequestRateLimit() func(c *gin.Context) {
 	return func(c *gin.Context) {
+		// The Images adapter has already passed this limiter on its public
+		// request. Its in-process quote and task requests are the same operation;
+		// this marker cannot be supplied through an HTTP header or request body.
+		if _, internal := c.Request.Context().Value(platformImageFingerprintKey{}).(string); internal {
+			c.Next()
+			return
+		}
 		// 在每个请求时检查是否启用限流
 		if !setting.ModelRequestRateLimitEnabled {
 			c.Next()

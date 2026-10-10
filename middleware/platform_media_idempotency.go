@@ -3,6 +3,7 @@ package middleware
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -26,6 +27,19 @@ var platformMediaLocks = struct {
 	entries map[string]*platformMediaLock
 }{entries: make(map[string]*platformMediaLock)}
 var platformMediaIdempotencyKey = regexp.MustCompile(`^[A-Za-z0-9_.:-]{8,160}$`)
+
+type platformImageFingerprintKey struct{}
+
+// Only an in-process compatibility request can supply this value. Unlike the
+// signed quote, the original Images request stays identical across retries.
+func PlatformImageRequestContext(ctx context.Context, fingerprint string) context.Context {
+	return context.WithValue(ctx, platformImageFingerprintKey{}, fingerprint)
+}
+
+func PlatformMediaTaskID(userID int, key string) string {
+	hash := sha256.Sum256([]byte(fmt.Sprintf("%d:%s", userID, key)))
+	return fmt.Sprintf("task_%x", hash[:16])
+}
 
 // Each tenant portal is a single process. Serialize identical submissions here;
 // a deterministic task ID is also the platform's durable billing idempotency key.
@@ -57,10 +71,11 @@ func PlatformMediaIdempotency() gin.HandlerFunc {
 			return
 		}
 		c.Request.Body = io.NopCloser(bytes.NewReader(body))
-		identity := fmt.Sprintf("%d:%s", c.GetInt("id"), key)
-		hash := sha256.Sum256([]byte(identity))
-		taskID := fmt.Sprintf("task_%x", hash[:16])
+		taskID := PlatformMediaTaskID(c.GetInt("id"), key)
 		fingerprint := fmt.Sprintf("%x", sha256.Sum256(normalized))
+		if original, ok := c.Request.Context().Value(platformImageFingerprintKey{}).(string); ok && original != "" {
+			fingerprint = original
+		}
 		platformMediaLocks.Lock()
 		entry := platformMediaLocks.entries[taskID]
 		if entry == nil {
