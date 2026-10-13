@@ -120,8 +120,29 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	var secondLastStreamData string // 保留倒数第二个stream data；部分兼容网关把完整usage放在倒数第二个事件
 	seenStreamToolCalls := make(map[string]struct{})
 	var streamFunctionCallNames []string
+	var streamError *types.NewAPIError
 
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
+		// HTTP 200 is only the transport envelope. An SSE error is a failed
+		// request, never an empty completion to bill from estimated input.
+		var frame dto.GeneralErrorResponse
+		if err := common.UnmarshalJsonStr(data, &frame); err != nil {
+			streamError = types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusBadGateway, types.ErrOptionWithSkipRetry())
+			sr.Stop(streamError)
+			return
+		}
+		if len(frame.Error) > 0 && string(frame.Error) != "null" {
+			upstreamError := frame.TryToOpenAIError()
+			if upstreamError == nil {
+				upstreamError = &types.OpenAIError{Type: "upstream_error", Message: frame.ToMessage()}
+			}
+			if upstreamError.Message == "" {
+				upstreamError.Message = "Upstream stream returned an error"
+			}
+			streamError = types.WithOpenAIError(*upstreamError, http.StatusBadGateway, types.ErrOptionWithSkipRetry())
+			sr.Stop(streamError)
+			return
+		}
 		if lastStreamData != "" {
 			if err := HandleStreamFormat(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent); err != nil {
 				common.SysLog("error handling stream format: " + err.Error())
@@ -141,6 +162,14 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 			}
 		}
 	})
+
+	if streamError != nil {
+		return nil, streamError
+	}
+	if responseTextBuilder.Len() == 0 && toolCount == 0 {
+		return nil, types.NewOpenAIError(fmt.Errorf("upstream stream returned no content or tool calls"),
+			types.ErrorCodeBadResponseBody, http.StatusBadGateway, types.ErrOptionWithSkipRetry())
+	}
 
 	// 处理最后的响应
 	shouldSendLastResp := true

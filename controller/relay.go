@@ -95,6 +95,13 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		if newAPIError != nil {
 			logger.LogError(c, fmt.Sprintf("relay error: %s", common.LocalLogPreview(newAPIError.Error())))
 			newAPIError.SetMessage(common.MessageWithRequestId(newAPIError.Error(), requestId))
+			if relayFormat == types.RelayFormatOpenAI && strings.HasPrefix(c.Writer.Header().Get("Content-Type"), "text/event-stream") {
+				// A role or keepalive frame may already have started the stream.
+				// Keep failures in SSE so clients cannot mistake them for EOF.
+				_ = helper.ObjectData(c, gin.H{"error": newAPIError.ToOpenAIError()})
+				helper.Done(c)
+				return
+			}
 			switch relayFormat {
 			case types.RelayFormatOpenAIRealtime:
 				helper.WssError(c, ws, newAPIError.ToOpenAIError())
