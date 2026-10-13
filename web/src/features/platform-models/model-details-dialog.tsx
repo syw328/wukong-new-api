@@ -1,17 +1,19 @@
 // Copyright (C) 2026 QuantumNous and contributors. AGPL-3.0-or-later.
+import { Link } from '@tanstack/react-router'
 import { Code2, Network } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { CopyButton } from '@/components/copy-button'
 import { Dialog } from '@/components/dialog'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuthStore } from '@/stores/auth-store'
 
+import { modelCategory } from './helpers'
 import { MarketMetrics, MarketModelIcon, MarketPrice } from './market-card'
 import { ModelApi } from './model-api'
 import { ModelPrices } from './model-prices'
-import { modelCategory } from './helpers'
 import { TYPE_LABELS, type ModelSummary, type PlatformModel } from './types'
 
 export function ModelDetailsDialog(props: {
@@ -105,6 +107,20 @@ export function ModelDetailsDialog(props: {
               <ModelPrices model={model.id} />
             </TabsContent>
             <TabsContent value='api' className='pt-5'>
+              <Button
+                variant='outline'
+                className='mb-4'
+                nativeButton={false}
+                render={
+                  <Link
+                    role='link'
+                    to='/docs'
+                    hash={`model/${encodeURIComponent(model.id)}`}
+                  />
+                }
+              >
+                {t('Open full API documentation')}
+              </Button>
               <ModelApi model={model} />
             </TabsContent>
           </Tabs>

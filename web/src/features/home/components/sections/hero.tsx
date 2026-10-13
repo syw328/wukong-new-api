@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { useStatus } from '@/hooks/use-status'
+import { portalRuntime } from '@/lib/portal-runtime'
 
 import { HeroTerminalDemo } from '../hero-terminal-demo'
 
@@ -48,8 +49,9 @@ const MoreIcon = () => (
 export function Hero(props: HeroProps) {
   const { t } = useTranslation()
   const { status } = useStatus()
-  const docsUrl =
-    (status?.docs_link as string | undefined) || 'https://docs.newapi.pro'
+  const docsUrl = portalRuntime().basePath
+    ? '/docs'
+    : (status?.docs_link as string | undefined) || 'https://docs.newapi.pro'
 
   const renderDocsButton = () => {
     const isExternal = docsUrl.startsWith('http')

@@ -12,6 +12,8 @@ import {
   TableCell,
 } from '@/components/ui/table'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { ProtocolReference } from '@/features/api-docs/protocol-reference'
+import { modelDocument } from '@/features/api-docs/reference'
 import { portalApiOrigin } from '@/lib/portal-runtime'
 
 import { usePlatformPrices } from './api'
@@ -28,7 +30,10 @@ function apiIntro(model: PlatformModel): string {
   }
   return 'Images, video and audio use the platform asynchronous media API. Parameters match this model on the website; request a quote before each creation.'
 }
-export function ModelApi(props: { model: PlatformModel }) {
+export function ModelApi(props: {
+  model: PlatformModel
+  documentMode?: boolean
+}) {
   const { t } = useTranslation()
   const root = portalApiOrigin()
   const [routeId, setRouteId] = useState('')
@@ -45,6 +50,17 @@ export function ModelApi(props: { model: PlatformModel }) {
   const curl = curlExample(props.model, root, route)
   return (
     <div className='space-y-6'>
+      {props.documentMode && (!routeId || route) && (
+        <CopyButton
+          size='sm'
+          variant='outline'
+          value={modelDocument(props.model, root, route, t)}
+          aria-label={t('Copy full model documentation')}
+        >
+          {t('Copy full model documentation')}
+        </CopyButton>
+      )}
+      {props.documentMode && <ProtocolReference model={props.model} />}
       <div className='space-y-2 rounded-xl border p-4'>
         <h3 className='font-semibold'>{t('API connection')}</h3>
         <p className='text-muted-foreground text-sm'>
