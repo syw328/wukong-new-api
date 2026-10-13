@@ -1,0 +1,122 @@
+/* Copyright (C) 2026 QuantumNous and contributors. AGPL-3.0-or-later. */
+.api-docs-page {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 100px 28px 64px;
+}
+.api-docs-topbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 8px 0 24px;
+  border-bottom: 1px solid var(--border);
+}
+.api-docs-base {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  justify-content: flex-end;
+}
+.api-docs-base span {
+  font-size: 10px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.api-docs-base code {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.api-docs-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+}
+.api-docs-sidebar {
+  position: sticky;
+  top: 80px;
+  max-height: calc(100dvh - 100px);
+  overflow: auto;
+  border-right: 1px solid var(--border);
+  padding: 24px 20px 24px 0;
+  align-self: start;
+}
+.api-docs-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 14px 0;
+}
+.api-docs-categories button {
+  font-size: 12px;
+}
+.api-docs-model-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.api-docs-model {
+  width: 100%;
+  height: auto;
+  min-height: 58px;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  white-space: normal;
+  text-align: left;
+}
+.api-docs-model span {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.api-docs-model code {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.api-docs-content {
+  min-width: 0;
+  padding: 36px clamp(20px, 4vw, 64px);
+  max-width: 1100px;
+}
+.api-docs-catalog-toggle {
+  display: none;
+}
+@media (max-width: 800px) {
+  .api-docs-page {
+    padding: 88px 16px 40px;
+  }
+  .api-docs-topbar {
+    gap: 12px;
+  }
+  .api-docs-base {
+    flex-basis: 100%;
+    order: 3;
+    justify-content: flex-start;
+  }
+  .api-docs-layout {
+    display: block;
+  }
+  .api-docs-catalog-toggle {
+    display: flex;
+    margin-top: 16px;
+  }
+  .api-docs-sidebar {
+    display: none;
+    position: static;
+    max-height: 55dvh;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 12px;
+  }
+  .api-docs-sidebar.is-open {
+    display: block;
+  }
+  .api-docs-content {
+    padding: 28px 0;
+  }
+}

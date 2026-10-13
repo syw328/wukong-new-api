@@ -96,7 +96,9 @@ export function useTopNavLinks(): TopNavLink[] {
 
   // Docs (supports external links)
   if (modules?.docs !== false) {
-    if (docsLink) {
+    if (portalRuntime().basePath) {
+      links.push({ title: t('Docs'), href: '/docs' })
+    } else if (docsLink) {
       links.push({ title: t('Docs'), href: docsLink, external: true })
     } else {
       links.push({ title: t('Docs'), href: '/docs' })
