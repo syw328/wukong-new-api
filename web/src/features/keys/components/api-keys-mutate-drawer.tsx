@@ -88,6 +88,7 @@ import {
   ApiKeyGroupCombobox,
   type ApiKeyGroupOption,
 } from './api-key-group-combobox'
+import { ApiKeyRoutingEditor } from './api-key-routing-editor'
 import { useApiKeys } from './api-keys-provider'
 import { AutoGroupOrderEditor } from './auto-group-order-editor'
 
@@ -113,6 +114,7 @@ export function ApiKeysMutateDrawer({
     null
   )
   const defaultUseAutoGroup = status?.default_use_auto_group === true
+  const platformRouting = status?.platform_key_routing === true
 
   // Fetch models
   const { data: modelsData } = useQuery({
@@ -198,7 +200,10 @@ export function ApiKeysMutateDrawer({
 
   const form = useForm<ApiKeyFormValues>({
     resolver: zodResolver(schema),
-    defaultValues: getApiKeyFormDefaultValues(defaultUseAutoGroup),
+    defaultValues: getApiKeyFormDefaultValues(
+      defaultUseAutoGroup,
+      platformRouting
+    ),
   })
 
   // Load existing data when updating
@@ -233,7 +238,10 @@ export function ApiKeysMutateDrawer({
       }
     } else {
       form.reset(
-        getApiKeyFormDefaultValues(defaultUseAutoGroup && backendHasAuto)
+        getApiKeyFormDefaultValues(
+          defaultUseAutoGroup && backendHasAuto,
+          platformRouting
+        )
       )
       setInitializedTarget(target)
     }
@@ -243,6 +251,7 @@ export function ApiKeysMutateDrawer({
     currentRow,
     form,
     defaultUseAutoGroup,
+    platformRouting,
     statusLoading,
     backendHasAuto,
     groupsFetched,
@@ -668,6 +677,38 @@ export function ApiKeysMutateDrawer({
               />
             </SideDrawerSection>
 
+            {platformRouting || form.watch('routing_policy') ? (
+              <ApiKeyRoutingEditor form={form} models={models} />
+            ) : (
+              <FormField
+                control={form.control}
+                name='model_limits'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Model Limits')}</FormLabel>
+                    <FormControl>
+                      <MultiSelect
+                        options={models.map((model) => ({
+                          value: model,
+                          label: model,
+                        }))}
+                        selected={field.value}
+                        onChange={(value) => {
+                          field.onChange(value)
+                          form.setValue(
+                            'model_limits_enabled',
+                            value.length > 0
+                          )
+                        }}
+                        placeholder={t('Select models (empty for allow all)')}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
               <SideDrawerSection>
                 <CollapsibleTrigger
@@ -693,33 +734,6 @@ export function ApiKeysMutateDrawer({
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <div className='flex flex-col gap-4 pt-2'>
-                    <FormField
-                      control={form.control}
-                      name='model_limits'
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t('Model Limits')}</FormLabel>
-                          <FormControl>
-                            <MultiSelect
-                              options={models.map((m) => ({
-                                label: m,
-                                value: m,
-                              }))}
-                              selected={field.value}
-                              onChange={field.onChange}
-                              placeholder={t(
-                                'Select models (empty for allow all)'
-                              )}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            {t('Limit which models can be used with this key')}
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
                     <FormField
                       control={form.control}
                       name='allow_ips'

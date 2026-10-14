@@ -94,6 +94,7 @@ func GetStatus(c *gin.Context) {
 		"password_login_enabled":        common.PasswordLoginEnabled,
 		"password_register_enabled":     common.PasswordRegisterEnabled,
 		"default_use_auto_group":        setting.DefaultUseAutoGroup,
+		"platform_key_routing":          service.PlatformKeyRoutingEnabled(),
 
 		"password_login_encryption_enabled": common.PasswordLoginEncryptionEnabled,
 

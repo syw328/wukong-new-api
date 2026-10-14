@@ -65,6 +65,19 @@ func proxyPlatformPortal(c *gin.Context, path string, accountPrice bool, mediaQu
 		}
 	}
 	if mediaQuote {
+		var payload struct {
+			Model string `json:"model"`
+		}
+		if common.Unmarshal(body, &payload) != nil {
+			c.JSON(400, gin.H{"success": false, "message": "Invalid model"})
+			return
+		}
+		policy, policyErr := service.PlatformKeyRoutingHeader(c.GetInt("id"), c.GetInt("token_id"), payload.Model)
+		if policyErr != nil {
+			c.JSON(403, gin.H{"success": false, "message": policyErr.Error()})
+			return
+		}
+		request.Header.Set(service.PlatformKeyContextHeader, policy)
 		gateway, readErr := model.GetChannelById(1, true)
 		if readErr != nil || gateway == nil || gateway.Status != 1 {
 			c.JSON(503, gin.H{"success": false, "message": "Platform gateway is not ready"})

@@ -136,6 +136,9 @@ func PlatformImagesCompatibility(router http.Handler) gin.HandlerFunc {
 			}
 			format = selectedFormat
 			native := map[string]any{"model": name, "prompt": input["prompt"], "params": params}
+			if strategy, present := input["routing_preference"]; present {
+				native["routing_preference"] = strategy
+			}
 			quote, err := bridge.call(http.MethodPost, "/v1/media/quotes", native, "", "", 1<<20)
 			if err != nil {
 				bridge.fail(c, 502, "quote_unavailable", "Unable to price the image request", "")

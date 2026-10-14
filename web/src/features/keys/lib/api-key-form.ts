@@ -22,7 +22,11 @@ import { z } from 'zod'
 import { parseQuotaFromDollars, quotaUnitsToDollars } from '@/lib/format'
 
 import { DEFAULT_GROUP } from '../constants'
-import type { ApiKey, ApiKeyFormData } from '../types'
+import {
+  keyRoutingPolicySchema,
+  type ApiKey,
+  type ApiKeyFormData,
+} from '../types'
 
 // ============================================================================
 // Form Schema
@@ -39,6 +43,8 @@ export function getApiKeyFormSchema(t: TFunction, maxAutoGroups = 5) {
       expired_time: z.date().optional(),
       unlimited_quota: z.boolean(),
       model_limits: z.array(z.string()),
+      model_limits_enabled: z.boolean(),
+      routing_policy: keyRoutingPolicySchema.nullable(),
       allow_ips: z.string().optional(),
       group: z.string().optional(),
       auto_groups_mode: z.enum(['inherit', 'custom']),
@@ -109,6 +115,14 @@ export const API_KEY_FORM_DEFAULT_VALUES: ApiKeyFormValues = {
   expired_time: undefined,
   unlimited_quota: true,
   model_limits: [],
+  model_limits_enabled: false,
+  routing_policy: {
+    version: 1,
+    default_strategy: 'balanced',
+    allowed_strategies: ['balanced', 'cheapest', 'fastest', 'most_reliable'],
+    allow_fixed_routes: false,
+    model_rules: [],
+  },
   allow_ips: '',
   group: DEFAULT_GROUP,
   auto_groups_mode: 'inherit',
@@ -118,10 +132,14 @@ export const API_KEY_FORM_DEFAULT_VALUES: ApiKeyFormValues = {
 }
 
 export function getApiKeyFormDefaultValues(
-  defaultUseAutoGroup: boolean
+  defaultUseAutoGroup: boolean,
+  platformRouting = false
 ): ApiKeyFormValues {
   return {
     ...API_KEY_FORM_DEFAULT_VALUES,
+    routing_policy: platformRouting
+      ? structuredClone(API_KEY_FORM_DEFAULT_VALUES.routing_policy)
+      : null,
     group: defaultUseAutoGroup ? 'auto' : DEFAULT_GROUP,
     auto_groups_mode: 'inherit',
     auto_groups: [],
@@ -148,7 +166,8 @@ export function transformFormDataToPayload(
       ? Math.floor(data.expired_time.getTime() / 1000)
       : -1,
     unlimited_quota: data.unlimited_quota,
-    model_limits_enabled: data.model_limits.length > 0,
+    model_limits_enabled: data.model_limits_enabled,
+    routing_policy: data.routing_policy,
     model_limits: data.model_limits.join(','),
     allow_ips: data.allow_ips || '',
     group: data.group || '',
@@ -185,6 +204,8 @@ export function transformApiKeyToFormDefaults(
         ? new Date(apiKey.expired_time * 1000)
         : undefined,
     unlimited_quota: apiKey.unlimited_quota,
+    model_limits_enabled: apiKey.model_limits_enabled,
+    routing_policy: apiKey.routing_policy ?? null,
     model_limits: apiKey.model_limits
       ? apiKey.model_limits.split(',').filter(Boolean)
       : [],

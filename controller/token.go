@@ -34,12 +34,14 @@ func (input *tokenAutoGroupsInput) UnmarshalJSON(data []byte) error {
 
 type tokenRequest struct {
 	model.Token
-	AutoGroups tokenAutoGroupsInput `json:"auto_groups"`
+	AutoGroups    tokenAutoGroupsInput      `json:"auto_groups"`
+	RoutingPolicy *model.TokenRoutingPolicy `json:"routing_policy"`
 }
 
 type tokenResponse struct {
 	*model.Token
-	AutoGroups []string `json:"auto_groups"`
+	AutoGroups    []string                  `json:"auto_groups"`
+	RoutingPolicy *model.TokenRoutingPolicy `json:"routing_policy"`
 }
 
 func maxTokenQuota() int {
@@ -66,7 +68,8 @@ func buildMaskedTokenResponse(token *model.Token) *tokenResponse {
 	if len(autoGroups) == 0 {
 		autoGroups = nil
 	}
-	return &tokenResponse{Token: &maskedToken, AutoGroups: autoGroups}
+	policy, _ := token.GetRoutingPolicy()
+	return &tokenResponse{Token: &maskedToken, AutoGroups: autoGroups, RoutingPolicy: policy}
 }
 
 func buildMaskedTokenResponses(tokens []*model.Token) []*tokenResponse {
@@ -323,6 +326,10 @@ func AddToken(c *gin.Context) {
 		token.CrossGroupRetry = false
 		_ = token.SetAutoGroups(nil)
 	}
+	if err := token.SetRoutingPolicy(request.RoutingPolicy); err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	key, err := common.GenerateKey()
 	if err != nil {
 		common.ApiErrorI18n(c, i18n.MsgTokenGenerateFailed)
@@ -344,6 +351,7 @@ func AddToken(c *gin.Context) {
 		Group:              token.Group,
 		CrossGroupRetry:    token.CrossGroupRetry,
 		AutoGroups:         token.AutoGroups,
+		RoutingPolicy:      token.RoutingPolicy,
 	}
 	err = cleanToken.Insert()
 	if err != nil {
@@ -439,6 +447,20 @@ func UpdateToken(c *gin.Context) {
 		cleanToken.AllowIps = token.AllowIps
 		cleanToken.Group = token.Group
 		cleanToken.CrossGroupRetry = token.CrossGroupRetry
+		if request.RoutingPolicy != nil {
+			if err := cleanToken.SetRoutingPolicy(request.RoutingPolicy); err != nil {
+				common.ApiError(c, err)
+				return
+			}
+		} else if policy, policyErr := cleanToken.GetRoutingPolicy(); policyErr != nil {
+			common.ApiError(c, policyErr)
+			return
+		} else if policy != nil {
+			if err := cleanToken.SetRoutingPolicy(policy); err != nil {
+				common.ApiError(c, err)
+				return
+			}
+		}
 		if token.Group != "auto" {
 			cleanToken.CrossGroupRetry = false
 			_ = cleanToken.SetAutoGroups(nil)
@@ -473,6 +495,7 @@ func UpdateToken(c *gin.Context) {
 			{"group", previous.Group != cleanToken.Group},
 			{"cross_group_retry", previous.CrossGroupRetry != cleanToken.CrossGroupRetry},
 			{"auto_groups", previous.AutoGroups != cleanToken.AutoGroups},
+			{"routing_policy", previous.RoutingPolicy != cleanToken.RoutingPolicy},
 		} {
 			if field.changed {
 				changedFields = append(changedFields, field.name)

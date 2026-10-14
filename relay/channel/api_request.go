@@ -290,7 +290,9 @@ func processHeaderOverride(info *common.RelayInfo, c *gin.Context) (map[string]s
 
 		headerOverride[key] = value
 	}
-	injectPlatformRelayHeaders(headerOverride, info)
+	if err := injectPlatformRelayHeaders(headerOverride, info); err != nil {
+		return nil, types.NewError(err, types.ErrorCodeChannelHeaderOverrideInvalid)
+	}
 	return headerOverride, nil
 }
 

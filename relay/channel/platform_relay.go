@@ -121,21 +121,33 @@ func PlatformRelayChannel(info *common.RelayInfo) bool {
 	return loadPlatformRelayConfig().appliesTo(info)
 }
 
-// injectPlatformRelayHeaders 把平台记账头合并进 header override 结果；显式 override 优先。
-func injectPlatformRelayHeaders(headers map[string]string, info *common.RelayInfo) {
+// Relay identity is server-owned. Client header passthrough and channel overrides
+// cannot substitute a different key policy or payer.
+func injectPlatformRelayHeaders(headers map[string]string, info *common.RelayInfo) error {
 	cfg := loadPlatformRelayConfig()
-	if !cfg.appliesTo(info) || info.IsChannelTest {
-		return
+	if info == nil || info.IsChannelTest {
+		return nil
 	}
-	if _, exists := headers[platformRelaySecretHeader]; !exists {
-		headers[platformRelaySecretHeader] = cfg.secret
+	if !cfg.appliesTo(info) {
+		return service.CheckKeyRoutingTarget(info.UserId, info.TokenId, false)
 	}
-	if _, exists := headers[platformRelayUserHeader]; exists {
-		return
+	for name := range headers {
+		if strings.HasPrefix(strings.ToLower(name), "x-platform-") {
+			delete(headers, name)
+		}
 	}
-	if providerUserId := platformProviderUserId(cfg, info.UserId); providerUserId != "" {
-		headers[platformRelayUserHeader] = providerUserId
+	userID := platformProviderUserId(cfg, info.UserId)
+	if userID == "" {
+		return fmt.Errorf("platform OAuth binding is required")
 	}
+	policy, err := service.PlatformKeyRoutingHeader(info.UserId, info.TokenId, info.OriginModelName)
+	if err != nil {
+		return err
+	}
+	headers[platformRelaySecretHeader] = cfg.secret
+	headers[platformRelayUserHeader] = userID
+	headers[service.PlatformKeyContextHeader] = policy
+	return nil
 }
 
 // Only the managed media integration may attach identity, and only after its

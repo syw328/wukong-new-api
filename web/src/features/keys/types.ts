@@ -22,6 +22,30 @@ import { z } from 'zod'
 // API Key Schema & Types
 // ============================================================================
 
+export const routingStrategySchema = z.enum([
+  'balanced',
+  'cheapest',
+  'fastest',
+  'most_reliable',
+])
+export type RoutingStrategy = z.infer<typeof routingStrategySchema>
+export const keyRoutingPolicySchema = z.object({
+  version: z.literal(1),
+  default_strategy: routingStrategySchema,
+  allowed_strategies: z.array(routingStrategySchema).min(1).max(4),
+  allow_fixed_routes: z.boolean(),
+  model_rules: z
+    .array(
+      z.object({
+        model: z.string(),
+        default_strategy: routingStrategySchema,
+        allowed_strategies: z.array(routingStrategySchema).min(1).max(4),
+      })
+    )
+    .max(500),
+})
+export type KeyRoutingPolicy = z.infer<typeof keyRoutingPolicySchema>
+
 export const apiKeySchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -43,6 +67,7 @@ export const apiKeySchema = z.object({
     }, z.boolean())
     .optional()
     .default(false),
+  routing_policy: keyRoutingPolicySchema.nullish(),
   model_limits_enabled: z.boolean(),
   model_limits: z.string().nullish().default(''),
   allow_ips: z.string().nullish().default(''),
@@ -88,6 +113,7 @@ export interface ApiKeyFormData {
   remain_quota: number
   expired_time: number
   unlimited_quota: boolean
+  routing_policy?: KeyRoutingPolicy | null
   model_limits_enabled: boolean
   model_limits: string
   allow_ips: string

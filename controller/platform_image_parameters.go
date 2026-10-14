@@ -60,7 +60,7 @@ func platformImageParameters(input map[string]any, model platformImageModel) (ma
 			continue
 		}
 		switch name {
-		case "model", "prompt", "n", "response_format", "size", "quality", "user":
+		case "model", "prompt", "n", "response_format", "size", "quality", "user", "routing_preference":
 		case "stream":
 			if value != false {
 				return nil, "", fmt.Errorf("Streaming images are not supported by this endpoint")

@@ -3,6 +3,7 @@ package controller
 import (
 	"bytes"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -891,4 +892,129 @@ func verifyAPITokenAudit(t *testing.T) {
 		require.NoError(t, model.DB.Model(&model.Token{}).Where("name = ?", "audit-down").Count(&count).Error)
 		assert.EqualValues(t, 1, count)
 	})
+}
+
+// Schema of tokens immediately before routing policies were introduced.
+type tokenBeforeRouting struct {
+	Id                 int            `json:"id"`
+	UserId             int            `json:"user_id" gorm:"index"`
+	Key                string         `json:"key" gorm:"type:varchar(128);uniqueIndex"`
+	Status             int            `json:"status" gorm:"default:1"`
+	Name               string         `json:"name" gorm:"index" `
+	CreatedTime        int64          `json:"created_time" gorm:"bigint"`
+	AccessedTime       int64          `json:"accessed_time" gorm:"bigint"`
+	ExpiredTime        int64          `json:"expired_time" gorm:"bigint;default:-1"` // -1 means never expired
+	RemainQuota        int            `json:"remain_quota" gorm:"default:0"`
+	UnlimitedQuota     bool           `json:"unlimited_quota"`
+	ModelLimitsEnabled bool           `json:"model_limits_enabled"`
+	ModelLimits        string         `json:"model_limits" gorm:"type:text"`
+	AllowIps           *string        `json:"allow_ips" gorm:"default:''"`
+	UsedQuota          int            `json:"used_quota" gorm:"default:0"` // used quota
+	Group              string         `json:"group" gorm:"default:''"`
+	CrossGroupRetry    bool           `json:"cross_group_retry"` // 跨分组重试，仅auto分组有效
+	AutoGroups         string         `json:"-" gorm:"type:text"`
+	DeletedAt          gorm.DeletedAt `gorm:"index"`
+}
+
+func (tokenBeforeRouting) TableName() string { return "tokens" }
+
+func TestTokenRoutingPolicyDatabaseMatrix(t *testing.T) {
+	for _, engine := range []struct{ name, env string }{{"sqlite", ""}, {"mysql", "TEST_MYSQL_DSN"}, {"postgres", "TEST_POSTGRES_DSN"}} {
+		for _, upgrade := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/upgrade=%v", engine.name, upgrade), func(t *testing.T) {
+				if engine.env != "" && os.Getenv(engine.env) == "" {
+					t.Skip(engine.env + " is not configured")
+				}
+				var db *gorm.DB
+				if engine.name == "sqlite" {
+					db = openTokenControllerTestDB(t)
+				} else {
+					var managed *bool
+					db, managed = openTokenControllerExternalDB(t, engine.name, os.Getenv(engine.env))
+					*managed = true
+				}
+				versionSQL := "SELECT version()"
+				if engine.name == "sqlite" {
+					versionSQL = "SELECT sqlite_version()"
+				}
+				var version string
+				require.NoError(t, db.Raw(versionSQL).Scan(&version).Error)
+				t.Logf("database version: %s", version)
+				if upgrade {
+					require.NoError(t, db.AutoMigrate(&tokenBeforeRouting{}))
+					require.NoError(t, db.Create(&tokenBeforeRouting{UserId: 71, Key: "routing-preserved-key", Status: common.TokenStatusEnabled,
+						Name: "preserved", ExpiredTime: -1, RemainQuota: 77, UsedQuota: 23, ModelLimitsEnabled: true,
+						ModelLimits: "gpt-image-2", AutoGroups: `["default"]`, Group: "auto", CrossGroupRetry: true}).Error)
+				}
+				for range 2 {
+					require.NoError(t, db.AutoMigrate(&model.Token{}))
+				}
+				var token *model.Token
+				if upgrade {
+					var stored model.Token
+					require.NoError(t, db.Where("user_id = ?", 71).First(&stored).Error)
+					assert.Equal(t, "routing-preserved-key", stored.Key)
+					assert.Equal(t, 77, stored.RemainQuota)
+					assert.Equal(t, 23, stored.UsedQuota)
+					assert.True(t, stored.ModelLimitsEnabled)
+					assert.Equal(t, "gpt-image-2", stored.ModelLimits)
+					assert.Equal(t, `["default"]`, stored.AutoGroups)
+					assert.True(t, stored.CrossGroupRetry)
+					assert.Empty(t, stored.RoutingPolicy)
+					token = &stored
+					require.Error(t, db.Transaction(func(tx *gorm.DB) error { return tx.Create(&model.Token{UserId: 72, Key: stored.Key}).Error }))
+				} else {
+					token = seedToken(t, db, 71, "new-policy", "routing-fresh-key")
+				}
+				policy := model.TokenRoutingPolicy{Version: 1, DefaultStrategy: "balanced", AllowedStrategies: []string{"balanced", "cheapest"},
+					ModelRules: []model.TokenModelRoutingRule{{Model: "gpt-image-2", DefaultStrategy: "cheapest", AllowedStrategies: []string{"cheapest"}}}}
+				payload := map[string]any{"id": token.Id, "name": "configured", "expired_time": -1, "unlimited_quota": true,
+					"model_limits_enabled": true, "model_limits": "gpt-image-2", "group": "default", "routing_policy": policy}
+				ctx, response := newAuthenticatedContext(t, http.MethodPut, "/api/token/", payload, 71)
+				UpdateToken(ctx)
+				require.True(t, decodeAPIResponse(t, response).Success, response.Body.String())
+				var saved model.Token
+				require.NoError(t, db.First(&saved, token.Id).Error)
+				parsed, err := saved.GetRoutingPolicy()
+				require.NoError(t, err)
+				assert.Equal(t, &policy, parsed)
+				projection, err := service.PlatformKeyRoutingHeader(71, token.Id, "platform-media:gpt-image-2")
+				require.NoError(t, err)
+				decoded, err := base64.RawURLEncoding.DecodeString(projection)
+				require.NoError(t, err)
+				var bound model.PlatformKeyRoutingContext
+				require.NoError(t, common.Unmarshal(decoded, &bound))
+				assert.Equal(t, "cheapest", bound.DefaultStrategy)
+				assert.Equal(t, []string{"cheapest"}, bound.AllowedStrategies)
+				assert.False(t, bound.AllowFixedRoutes)
+				assert.NotContains(t, string(decoded), token.Key)
+				require.Error(t, service.CheckKeyRoutingTarget(71, token.Id, false))
+				require.NoError(t, service.CheckKeyRoutingTarget(71, token.Id, true))
+				_, err = service.PlatformKeyRoutingHeader(72, token.Id, "gpt-image-2")
+				require.Error(t, err)
+				_, err = service.PlatformKeyRoutingHeader(71, token.Id, "other-model")
+				require.Error(t, err)
+				// Old clients omit routing_policy when editing. Such an update cannot erase the restriction.
+				delete(payload, "routing_policy")
+				ctx, response = newAuthenticatedContext(t, http.MethodPut, "/api/token/", payload, 71)
+				UpdateToken(ctx)
+				require.True(t, decodeAPIResponse(t, response).Success)
+				current, err := service.PlatformKeyRoutingHeader(71, token.Id, "gpt-image-2")
+				require.NoError(t, err)
+				assert.Equal(t, projection, current)
+				// An attempted invalid update is atomic; the previous policy still governs paid requests.
+				policy.ModelRules[0].AllowedStrategies = []string{"unknown"}
+				payload["routing_policy"] = policy
+				ctx, response = newAuthenticatedContext(t, http.MethodPut, "/api/token/", payload, 71)
+				UpdateToken(ctx)
+				assert.False(t, decodeAPIResponse(t, response).Success)
+				current, err = service.PlatformKeyRoutingHeader(71, token.Id, "gpt-image-2")
+				require.NoError(t, err)
+				assert.Equal(t, projection, current)
+				require.NoError(t, db.Model(&model.Token{}).Where("id = ?", token.Id).Update("model_limits", "different-model").Error)
+				_, err = service.PlatformKeyRoutingHeader(71, token.Id, "gpt-image-2")
+				require.Error(t, err, "paid requests must re-read current model permissions")
+			})
+		}
+	}
 }

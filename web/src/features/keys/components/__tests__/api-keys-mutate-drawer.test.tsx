@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, test } from 'vitest'
 
 const { createInstance } = await import('i18next')
@@ -51,9 +52,15 @@ function installApiFixtures(createdPayloads: Array<Record<string, unknown>>) {
   apiClient.get = async (url) => {
     switch (url) {
       case '/api/status':
-        return { data: { data: { default_use_auto_group: true } } }
+        return {
+          data: {
+            data: { default_use_auto_group: true, platform_key_routing: true },
+          },
+        }
       case '/api/user/models':
-        return { data: { success: true, data: [] } }
+        return {
+          data: { success: true, data: ['gpt-image-2', 'seedance-2.0-fast'] },
+        }
       case '/api/user/self/groups':
         return {
           data: {
@@ -91,12 +98,12 @@ async function renderCreateDrawer(): Promise<void> {
   const freshAt = Date.now() + 60_000
   queryClient.setQueryData(
     ['status'],
-    { default_use_auto_group: true },
+    { default_use_auto_group: true, platform_key_routing: true },
     { updatedAt: freshAt }
   )
   queryClient.setQueryData(
     ['user-models'],
-    { success: true, data: [] },
+    { success: true, data: ['gpt-image-2', 'seedance-2.0-fast'] },
     { updatedAt: freshAt }
   )
   queryClient.setQueryData(
@@ -276,5 +283,78 @@ describe('API keys mutate drawer Auto group integration', () => {
     fireEvent.click(findButton('Save changes', true))
     await waitFor(() => expect(createdPayloads).toHaveLength(1))
     expect(createdPayloads[0]?.auto_groups).toEqual(['vip'])
+  })
+})
+
+test('routing permission dialog keeps cancellation local and saves model strategy restrictions together', async () => {
+  const createdPayloads: Array<Record<string, unknown>> = []
+  installApiFixtures(createdPayloads)
+  await renderCreateDrawer()
+  fireEvent.click(findButton('Configure model and strategy permissions', true))
+  const dialog = screen.getByRole('dialog', {
+    name: 'Model and strategy permissions',
+  })
+  const draftDefault = dialog.querySelector(
+    'select[aria-label="Default routing strategy"]'
+  )
+  if (!draftDefault) throw new Error('Expected routing strategy control')
+  fireEvent.change(draftDefault, { target: { value: 'cheapest' } })
+  fireEvent.click(findButton('Cancel', true))
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('dialog', { name: 'Model and strategy permissions' })
+    ).toBeNull()
+  )
+  expect(screen.getByLabelText('Default routing strategy')).toHaveValue(
+    'balanced'
+  )
+
+  fireEvent.click(findButton('Configure model and strategy permissions', true))
+  fireEvent.click(
+    screen.getByRole('switch', { name: 'Allow selected models only' })
+  )
+  expect(findButton('Apply permissions', true)).toBeDisabled()
+  const user = userEvent.setup()
+  await user.type(
+    screen.getByPlaceholderText('Select at least one model'),
+    'gpt-image'
+  )
+  fireEvent.click(await screen.findByRole('option', { name: 'gpt-image-2' }))
+  await user.type(
+    screen.getByPlaceholderText('Choose a model to configure'),
+    'gpt-image'
+  )
+  fireEvent.click(await screen.findByRole('option', { name: 'gpt-image-2' }))
+  const permissionGroup = screen.getByRole('group', {
+    name: 'Allowed strategies for gpt-image-2',
+  })
+  for (const checkbox of permissionGroup.querySelectorAll<HTMLInputElement>(
+    '[role="checkbox"]'
+  )) {
+    if (!checkbox.closest('label')?.textContent?.includes('Price priority')) {
+      fireEvent.click(checkbox)
+    }
+  }
+  fireEvent.click(findButton('Apply permissions', true))
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('dialog', { name: 'Model and strategy permissions' })
+    ).toBeNull()
+  )
+  changeInput(getControlByLabel('Name'), 'restricted-media')
+  fireEvent.click(findButton('Save changes', true))
+  await waitFor(() => expect(createdPayloads).toHaveLength(1))
+  expect(createdPayloads[0]?.model_limits_enabled).toBe(true)
+  expect(createdPayloads[0]?.model_limits).toBe('gpt-image-2')
+  expect(createdPayloads[0]?.routing_policy).toMatchObject({
+    default_strategy: 'balanced',
+    allow_fixed_routes: false,
+    model_rules: [
+      {
+        model: 'gpt-image-2',
+        default_strategy: 'cheapest',
+        allowed_strategies: ['cheapest'],
+      },
+    ],
   })
 })

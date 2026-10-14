@@ -1268,6 +1268,16 @@ func (a *TaskAdaptor) buildSubmit(c *gin.Context, info *relaycommon.RelayInfo) (
 	if err := channel.ApplyPlatformMediaIdentity(a.plugin.Meta.Key, info.ChannelBaseUrl, descriptor.URL, info.UserId, descriptor.Headers); err != nil {
 		return nil, err
 	}
+	if err := service.CheckKeyRoutingTarget(info.UserId, info.TokenId, a.plugin.Meta.Key == "platform-media"); err != nil {
+		return nil, err
+	}
+	if a.plugin.Meta.Key == "platform-media" {
+		policy, err := service.PlatformKeyRoutingHeader(info.UserId, info.TokenId, info.OriginModelName)
+		if err != nil {
+			return nil, err
+		}
+		descriptor.Headers[service.PlatformKeyContextHeader] = policy
+	}
 	a.submit = &descriptor
 	method := strings.ToUpper(strings.TrimSpace(descriptor.Method))
 	if method == "" {

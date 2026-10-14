@@ -1,21 +1,3 @@
-/*
-Copyright (C) 2023-2026 QuantumNous
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, either version 3 of the
-License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-For commercial licensing, please contact support@quantumnous.com
-*/
 import { Check, Copy, Loader2 } from 'lucide-react'
 import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -37,6 +19,25 @@ import {
 } from '@/components/ui/tooltip'
 import { copyToClipboard } from '@/lib/copy-to-clipboard'
 
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+import { ROUTING_STRATEGY_LABELS } from '../constants'
 import type { ApiKey } from '../types'
 import { useApiKeys } from './api-keys-provider'
 
@@ -147,13 +148,32 @@ export function ModelLimitsCell(props: ApiKeyRestrictionProps) {
     : []
 
   return (
-    <ApiKeyRestrictionCell
-      items={models}
-      label={t('{{count}} models', { count: models.length })}
-      title={t('Models')}
-      emptyLabel={t('Unlimited')}
-      detailsTrigger={props.detailsTrigger}
-    />
+    <div className='flex flex-col gap-1'>
+      <ApiKeyRestrictionCell
+        items={models}
+        label={t('{{count}} models', { count: models.length })}
+        title={t('Models')}
+        emptyLabel={
+          props.apiKey.model_limits_enabled
+            ? t('No models allowed')
+            : t('Unlimited')
+        }
+        detailsTrigger={props.detailsTrigger}
+      />
+      {props.apiKey.routing_policy && (
+        <span className='text-muted-foreground text-xs'>
+          {t(
+            ROUTING_STRATEGY_LABELS[
+              props.apiKey.routing_policy.default_strategy
+            ]
+          )}{' '}
+          ·{' '}
+          {t('{{count}} model strategy rules', {
+            count: props.apiKey.routing_policy.model_rules.length,
+          })}
+        </span>
+      )}
+    </div>
   )
 }
 
