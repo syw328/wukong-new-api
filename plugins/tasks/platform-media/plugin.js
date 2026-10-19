@@ -1,7 +1,8 @@
 // Copyright (C) 2026 QuantumNous and contributors. AGPL-3.0-or-later.
 // Platform wallet is authoritative. A signed quote binds user, request and cap.
-// The synchronizer changes only these two declarations using the public catalog.
+// The synchronizer changes these declarations using the public catalog.
 const PLATFORM_MODELS = ["__platform_media__"];
+const PLATFORM_MODEL_TYPES = {};
 const PLATFORM_VERSION = "1.0.0";
 export const meta = {
   apiVersion: 1, key: "platform-media", name: "Platform media", version: PLATFORM_VERSION,
@@ -57,10 +58,14 @@ export function buildQueryRequest(ctx) {
   return { method: "GET", url: ctx.baseUrl.replace(/\/+$/, "") + "/v1/media/generations/" + encodeURIComponent(ctx.taskId),
     headers: { Authorization: authorization(ctx) }, responseType: "json" };
 }
+function failureReason(data) {
+  const message = typeof (data.error || {}).message === "string" ? data.error.message : "生成失败，请查询原任务或联系平台支持";
+  return message + (data.billing && data.billing.state === "settled" && data.billing.charged === 0 ? "；本次未扣费" : "");
+}
 export function parseTaskResult(ctx, body) {
   const data = bodyOf(body); const status = platformState(data);
   return { taskId: ctx.taskId, status: status, progress: status === "SUCCESS" || status === "FAILURE" ? "100%" : "0%",
-    reason: status === "FAILURE" ? "Generation failed; platform charge is zero" : "", state: Object.assign({}, data, { request_fingerprint: (ctx.state || ctx.data || {}).request_fingerprint || "" }) };
+    reason: status === "FAILURE" ? failureReason(data) : "", state: Object.assign({}, data, { request_fingerprint: (ctx.state || ctx.data || {}).request_fingerprint || "" }) };
 }
 export function extractUsageOnSubmit(ctx, taskData) {
   const data = taskData || {};
@@ -77,10 +82,14 @@ function outputsOf(task) {
   const data = task.state || task.data || {};
   return data.result && Array.isArray(data.result.outputs) ? data.result.outputs.slice(0, 8) : [];
 }
-export function listArtifacts(task) {
+function modalityOf(task) {
   const data = task.data || {};
+  const type = data.modality || (task.state || {}).modality || PLATFORM_MODEL_TYPES[data.model || task.model];
+  return ["image", "video", "audio"].includes(type) ? type : "";
+}
+export function listArtifacts(task) {
   if (String(task.status).toUpperCase() !== "SUCCESS") return [];
-  const type = ["image", "video", "audio"].includes(data.modality) ? data.modality : "file";
+  const type = modalityOf(task) || "file";
   const outputs = outputsOf(task);
   if (outputs.length < 2) return [{ key: "result", type: outputs[0] && outputs[0].kind === "text" ? "file" : type }];
   return outputs.map(function(output, index) {
@@ -98,10 +107,10 @@ function renderTask(ctx, task) {
   const data = task.data || {};
   const status = { SUCCESS: "completed", FAILURE: "failed" }[String(task.status).toUpperCase()] || "processing";
   const artifacts = task.artifacts || [];
-  return { id: task.task_id, object: "media.generation", model: task.model || data.model, modality: data.modality,
+  return { id: task.task_id, object: "media.generation", model: task.model || data.model, modality: modalityOf(task),
     status: status, billing: { currency: "CREDITS", state: status === "processing" ? "pending" : "settled" },
     result: status === "completed" ? { artifacts_url: "/v1/tasks/" + encodeURIComponent(task.task_id) + "/artifacts", artifacts: artifacts } : null,
-    error: status === "failed" ? { code: "generation_failed", message: task.fail_reason || "Generation failed" } : null,
+    error: status === "failed" ? { code: (data.error || {}).code || "generation_failed", message: failureReason(data) } : null,
     poll_after_seconds: status === "processing" ? 3 : null };
 }
 export const native = {
