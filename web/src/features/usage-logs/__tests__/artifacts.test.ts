@@ -17,7 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import assert from 'node:assert/strict'
-import { describe, test } from 'vitest'
+
+import { afterEach, describe, expect, test } from 'vitest'
 
 import {
   getSafePluginAuthorUrl,
@@ -29,6 +30,10 @@ import {
 import type { TaskLog } from '../types'
 
 const artifactAccessToken = `${'A'.repeat(41)}-_`
+
+afterEach(() => {
+  document.querySelector('#platform-portal-runtime')?.remove()
+})
 
 function artifactContentUrl(
   artifactKey: string,
@@ -61,6 +66,44 @@ function taskFixture(overrides: Partial<TaskLog> = {}): TaskLog {
 }
 
 describe('task artifact projection', () => {
+  test.each([
+    'https://api.example.com',
+    'https://api.example.com/media-prefix',
+    `${window.location.origin}/api/open-platform`,
+  ])('keeps mounted portal downloads same-origin for %s', (baseUrl) => {
+    const runtime = document.createElement('script')
+    runtime.id = 'platform-portal-runtime'
+    runtime.type = 'application/json'
+    runtime.textContent = JSON.stringify({
+      origin: window.location.origin,
+      basePath: '/api',
+      transportPath: '/api/open-platform',
+    })
+    document.head.appendChild(runtime)
+
+    const projection = parseTaskArtifactsResponse({
+      success: true,
+      data: {
+        artifacts: [
+          {
+            key: 'result',
+            type: 'image',
+            content_url: artifactContentUrl('result', baseUrl),
+          },
+        ],
+        legacy_content_url: artifactContentUrl('video', baseUrl),
+      },
+    })
+
+    const origin = `${window.location.origin}/api/open-platform`
+    expect(projection.artifacts[0].content_url).toBe(
+      artifactContentUrl('result', origin)
+    )
+    expect(projection.legacyContentUrl).toBe(
+      artifactContentUrl('video', origin)
+    )
+  })
+
   test('enables projection only after a successful artifact viewer opens', () => {
     const successfulPluginTask = taskFixture()
 

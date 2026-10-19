@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { portalRuntime } from '@/lib/portal-runtime'
+
 import { TASK_STATUS } from '../constants'
 import type {
   TaskArtifact,
@@ -70,6 +72,7 @@ function parseContentUrl(value: unknown): string {
 
   try {
     const url = new URL(contentUrl)
+    const contentPath = url.pathname.match(taskArtifactContentPathPattern)?.[0]
     const authorityStart = contentUrl.indexOf('//') + 2
     const pathStart = contentUrl.indexOf('/', authorityStart)
     const authority = contentUrl.slice(
@@ -83,7 +86,7 @@ function parseContentUrl(value: unknown): string {
       url.username ||
       url.password ||
       url.hash ||
-      !taskArtifactContentPathPattern.test(url.pathname)
+      !contentPath
     ) {
       throw new TaskArtifactApiError('invalid_content_url')
     }
@@ -95,7 +98,12 @@ function parseContentUrl(value: unknown): string {
     ) {
       throw new TaskArtifactApiError('invalid_content_url')
     }
-    return contentUrl
+    const portal = portalRuntime()
+    // Native download links must stay same-origin in a mounted portal.
+    // The existing transport keeps the task capability and tenant checks intact.
+    return portal.transportPath
+      ? `${portal.origin}${portal.transportPath}${contentPath}${url.search}`
+      : contentUrl
   } catch (error) {
     if (error instanceof TaskArtifactApiError) throw error
     throw new TaskArtifactApiError('invalid_content_url')
