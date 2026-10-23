@@ -27,6 +27,7 @@ type FormatJsonSchema struct {
 // GeneralOpenAIRequest represents a general request structure for OpenAI-compatible APIs.
 // 参数增加规范：无引用的参数必须使用json.RawMessage类型，并添加omitempty标签
 type GeneralOpenAIRequest struct {
+	RoutingPreference   json.RawMessage   `json:"routing_preference,omitempty"`
 	Model               string            `json:"model,omitempty"`
 	Messages            []Message         `json:"messages,omitempty"`
 	Prompt              any               `json:"prompt,omitempty"`

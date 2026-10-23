@@ -307,3 +307,11 @@ func TestGeneralOpenAIRequestPreserveMessageLevelTools(t *testing.T) {
 	assert.Contains(t, meta.CombineText, "Get the current time of a city")
 	assert.Contains(t, meta.CombineText, "lookup_order")
 }
+
+func TestGeneralOpenAIRequestPreservesRoutingPreference(t *testing.T) {
+	var req GeneralOpenAIRequest
+	require.NoError(t, kitutil.Unmarshal([]byte(`{"model":"gpt-test","routing_preference":"cheapest"}`), &req))
+	encoded, err := kitutil.Marshal(req)
+	require.NoError(t, err)
+	assert.Equal(t, "cheapest", gjson.GetBytes(encoded, "routing_preference").String())
+}
