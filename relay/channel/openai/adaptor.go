@@ -246,6 +246,11 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
+	// The platform selects the actual vendor/protocol and owns validation.
+	// Applying one vendor's capabilities here would silently erase client controls.
+	if channel.PlatformRelayChannel(info) {
+		return request, nil
+	}
 	if info.ChannelType != constant.ChannelTypeOpenAI && info.ChannelType != constant.ChannelTypeAzure {
 		request.StreamOptions = nil
 	}

@@ -76,6 +76,9 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 	var responseTextBuilder strings.Builder
 	imageCounter := &relaycommon.ImageGenerationCallCounter{}
 	imageCommitted := false
+	terminal := ""
+	reportedUsage := false
+	var streamErr *types.NewAPIError
 
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
 
@@ -87,10 +90,15 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 			return
 		}
 		sendResponsesStreamData(c, streamResponse, data)
+		if terminal != "" {
+			return // An observed terminal receipt cannot be replaced by trailing data.
+		}
 		switch streamResponse.Type {
-		case "response.completed", "response.done":
+		case "response.completed", "response.done", "response.incomplete":
+			terminal = streamResponse.Type
 			if streamResponse.Response != nil {
 				if streamResponse.Response.Usage != nil {
+					reportedUsage = true
 					incomingUsage := relayconvert.NormalizeResponsesUsage(streamResponse.Response.Usage)
 					usage = dto.MergeUsageNonZero(usage, incomingUsage)
 				}
@@ -112,7 +120,12 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 				imageCounter.Commit(info)
 				imageCommitted = true
 			}
-		case "response.failed", "response.incomplete", "response.cancelled", "response.canceled":
+		case "response.failed", "response.cancelled", "response.canceled", "error":
+			terminal = streamResponse.Type
+			if streamResponse.Response != nil && streamResponse.Response.Usage != nil {
+				usage = relayconvert.NormalizeResponsesUsage(streamResponse.Response.Usage)
+			}
+			streamErr = types.NewOpenAIError(fmt.Errorf("upstream returned %s", terminal), types.ErrorCodeBadResponse, http.StatusBadGateway, types.ErrOptionWithSkipRetry())
 			if !imageCommitted {
 				imageCounter.Reset()
 				imageCounter.Commit(info)
@@ -139,7 +152,13 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 		}
 	})
 
-	if usage.CompletionTokens == 0 {
+	if terminal == "" {
+		streamErr = types.NewOpenAIError(fmt.Errorf("upstream Responses stream ended without a terminal event"), types.ErrorCodeBadResponse, http.StatusBadGateway, types.ErrOptionWithSkipRetry())
+	}
+	if streamErr != nil {
+		return usage, streamErr
+	}
+	if !reportedUsage && usage.CompletionTokens == 0 {
 		// 计算输出文本的 token 数量
 		tempStr := responseTextBuilder.String()
 		if len(tempStr) > 0 {
@@ -149,7 +168,7 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 		}
 	}
 
-	if usage.PromptTokens == 0 && usage.CompletionTokens != 0 {
+	if !reportedUsage && usage.PromptTokens == 0 && usage.CompletionTokens != 0 {
 		usage.PromptTokens = info.GetEstimatePromptTokens()
 	}
 
