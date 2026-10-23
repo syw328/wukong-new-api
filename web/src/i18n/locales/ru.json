@@ -6573,6 +6573,18 @@
     "Stability priority": "Stability priority",
     "{{count}} model strategy rules": "{{count}} model strategy rules",
     "{{count}} models allowed": "{{count}} models allowed",
-    "No models allowed": "No models allowed"
+    "No models allowed": "No models allowed",
+    "Reference prices checked": "Проверка ориентировочных цен",
+    "Reference prices for a 1-second video; request a live quote for your actual video.": "Ориентировочная цена за видео длительностью 1 секунда. Для вашего видео запросите актуальный расчет; минимальная плата может влиять на итог.",
+    "Standard · 720P · ≤30 FPS": "Стандарт · 720P · ≤30 FPS",
+    "Standard · 720P · >30 FPS / 1080P · ≤30 FPS": "Стандарт · 720P · >30 FPS / 1080P · ≤30 FPS",
+    "Standard · 1080P · >30 FPS / 2K · ≤30 FPS": "Стандарт · 1080P · >30 FPS / 2K · ≤30 FPS",
+    "Standard · 2K · >30 FPS / 4K · ≤30 FPS": "Стандарт · 2K · >30 FPS / 4K · ≤30 FPS",
+    "Standard · 4K · >30 FPS": "Стандарт · 4K · >30 FPS",
+    "Pro · 720P · ≤30 FPS": "Про · 720P · ≤30 FPS",
+    "Pro · 720P · >30 FPS / 1080P · ≤30 FPS": "Про · 720P · >30 FPS / 1080P · ≤30 FPS",
+    "Pro · 1080P · >30 FPS / 2K · ≤30 FPS": "Про · 1080P · >30 FPS / 2K · ≤30 FPS",
+    "Pro · 2K · >30 FPS / 4K · ≤30 FPS": "Про · 2K · >30 FPS / 4K · ≤30 FPS",
+    "Pro · 4K · >30 FPS": "Про · 4K · >30 FPS"
   }
 }

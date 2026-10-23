@@ -6725,6 +6725,18 @@
     "Stability priority": "稳定优先",
     "{{count}} model strategy rules": "{{count}} 条模型专属策略",
     "{{count}} models allowed": "允许 {{count}} 个模型",
-    "No models allowed": "不允许任何模型"
+    "No models allowed": "不允许任何模型",
+    "Reference prices checked": "参考价核对时间",
+    "Reference prices for a 1-second video; request a live quote for your actual video.": "以下为 1 秒视频的参考价；实际视频请先获取实时报价，最低费用等规则可能影响总价。",
+    "Standard · 720P · ≤30 FPS": "标准 · 720P · ≤30 FPS",
+    "Standard · 720P · >30 FPS / 1080P · ≤30 FPS": "标准 · 720P · >30 FPS / 1080P · ≤30 FPS",
+    "Standard · 1080P · >30 FPS / 2K · ≤30 FPS": "标准 · 1080P · >30 FPS / 2K · ≤30 FPS",
+    "Standard · 2K · >30 FPS / 4K · ≤30 FPS": "标准 · 2K · >30 FPS / 4K · ≤30 FPS",
+    "Standard · 4K · >30 FPS": "标准 · 4K · >30 FPS",
+    "Pro · 720P · ≤30 FPS": "专业 · 720P · ≤30 FPS",
+    "Pro · 720P · >30 FPS / 1080P · ≤30 FPS": "专业 · 720P · >30 FPS / 1080P · ≤30 FPS",
+    "Pro · 1080P · >30 FPS / 2K · ≤30 FPS": "专业 · 1080P · >30 FPS / 2K · ≤30 FPS",
+    "Pro · 2K · >30 FPS / 4K · ≤30 FPS": "专业 · 2K · >30 FPS / 4K · ≤30 FPS",
+    "Pro · 4K · >30 FPS": "专业 · 4K · >30 FPS"
   }
 }

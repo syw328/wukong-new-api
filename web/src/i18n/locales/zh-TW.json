@@ -6573,6 +6573,18 @@
     "Stability priority": "Stability priority",
     "{{count}} model strategy rules": "{{count}} model strategy rules",
     "{{count}} models allowed": "{{count}} models allowed",
-    "No models allowed": "No models allowed"
+    "No models allowed": "No models allowed",
+    "Reference prices checked": "參考價核對時間",
+    "Reference prices for a 1-second video; request a live quote for your actual video.": "以下為 1 秒影片的參考價；實際影片請先取得即時報價，最低費用等規則可能影響總價。",
+    "Standard · 720P · ≤30 FPS": "標準 · 720P · ≤30 FPS",
+    "Standard · 720P · >30 FPS / 1080P · ≤30 FPS": "標準 · 720P · >30 FPS / 1080P · ≤30 FPS",
+    "Standard · 1080P · >30 FPS / 2K · ≤30 FPS": "標準 · 1080P · >30 FPS / 2K · ≤30 FPS",
+    "Standard · 2K · >30 FPS / 4K · ≤30 FPS": "標準 · 2K · >30 FPS / 4K · ≤30 FPS",
+    "Standard · 4K · >30 FPS": "標準 · 4K · >30 FPS",
+    "Pro · 720P · ≤30 FPS": "專業 · 720P · ≤30 FPS",
+    "Pro · 720P · >30 FPS / 1080P · ≤30 FPS": "專業 · 720P · >30 FPS / 1080P · ≤30 FPS",
+    "Pro · 1080P · >30 FPS / 2K · ≤30 FPS": "專業 · 1080P · >30 FPS / 2K · ≤30 FPS",
+    "Pro · 2K · >30 FPS / 4K · ≤30 FPS": "專業 · 2K · >30 FPS / 4K · ≤30 FPS",
+    "Pro · 4K · >30 FPS": "專業 · 4K · >30 FPS"
   }
 }

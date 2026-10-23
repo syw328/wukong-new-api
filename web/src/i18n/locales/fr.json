@@ -6573,6 +6573,18 @@
     "Stability priority": "Stability priority",
     "{{count}} model strategy rules": "{{count}} model strategy rules",
     "{{count}} models allowed": "{{count}} models allowed",
-    "No models allowed": "No models allowed"
+    "No models allowed": "No models allowed",
+    "Reference prices checked": "Prix indicatifs vérifiés",
+    "Reference prices for a 1-second video; request a live quote for your actual video.": "Prix indicatifs pour une vidéo de 1 seconde ; demandez un devis en temps réel pour votre vidéo. Les frais minimaux peuvent modifier le total.",
+    "Standard · 720P · ≤30 FPS": "Standard · 720P · ≤30 FPS",
+    "Standard · 720P · >30 FPS / 1080P · ≤30 FPS": "Standard · 720P · >30 FPS / 1080P · ≤30 FPS",
+    "Standard · 1080P · >30 FPS / 2K · ≤30 FPS": "Standard · 1080P · >30 FPS / 2K · ≤30 FPS",
+    "Standard · 2K · >30 FPS / 4K · ≤30 FPS": "Standard · 2K · >30 FPS / 4K · ≤30 FPS",
+    "Standard · 4K · >30 FPS": "Standard · 4K · >30 FPS",
+    "Pro · 720P · ≤30 FPS": "Pro · 720P · ≤30 FPS",
+    "Pro · 720P · >30 FPS / 1080P · ≤30 FPS": "Pro · 720P · >30 FPS / 1080P · ≤30 FPS",
+    "Pro · 1080P · >30 FPS / 2K · ≤30 FPS": "Pro · 1080P · >30 FPS / 2K · ≤30 FPS",
+    "Pro · 2K · >30 FPS / 4K · ≤30 FPS": "Pro · 2K · >30 FPS / 4K · ≤30 FPS",
+    "Pro · 4K · >30 FPS": "Pro · 4K · >30 FPS"
   }
 }

@@ -101,6 +101,11 @@ export function MarketPrice(props: {
           {t('credits')} / {t(units[price.unit])}
         </span>
       </div>
+      {props.summary?.liveQuote && (
+        <p className='text-muted-foreground mt-2 text-xs'>
+          {t('Quoted per video before each task')}
+        </p>
+      )}
       {price.unit === 'tokens' && (
         <div className='text-muted-foreground mt-1.5 text-xs'>
           {t(price.input != null ? 'Input' : 'Output')}

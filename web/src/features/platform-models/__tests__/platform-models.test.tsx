@@ -186,3 +186,30 @@ it('formats project Chinese locale IDs without crashing the actual price page', 
   expect(formatPriceBookDate('2026-09-15T00:00:00Z', 'zhTW')).toContain('08:00')
   expect(formatPriceBookDate('bad-date', 'zhCN')).toBe('—')
 })
+
+it('shows video HD reference prices and one live route without claiming daily locked prices', () => {
+  const detail = data(null)
+  detail.liveQuote = true
+  detail.statisticsAvailable = false
+  detail.routes[0].rows[0].estimate = {
+    nativeUnit: 'second',
+    amount: 0.08,
+    unitPrice: 0.08,
+  }
+  mocks.prices.mockReturnValue({
+    data: detail,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  })
+  render(<ModelPrices model='tool-video-enhance' />)
+  expect(screen.getByText('0.08')).toBeTruthy()
+  expect(screen.getByText('1 routes')).toBeTruthy()
+  expect(screen.getByText(/Reference prices checked/)).toBeTruthy()
+  expect(screen.queryByText(/Daily price book/)).toBeNull()
+  expect(screen.queryByText('Estimated total')).toBeNull()
+  expect(
+    screen.queryByText(/Statistics are temporarily unavailable/)
+  ).toBeNull()
+  expect(screen.getByText(/1-second video/)).toBeTruthy()
+})

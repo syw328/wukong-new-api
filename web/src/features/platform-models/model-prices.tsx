@@ -133,6 +133,7 @@ function RouteCard(props: {
   route: PriceRoute
   type: string
   statisticsAvailable: boolean
+  referenceOnly?: boolean
   onChange: (variant: number, values: Record<string, Scalar>) => void
 }) {
   const { t } = useTranslation()
@@ -146,6 +147,9 @@ function RouteCard(props: {
     if (nativeUnit === 'tokens') return t('1M tokens')
     return t(nativeUnit)
   }
+  const pricingLabel = props.referenceOnly
+    ? 'Reference price'
+    : 'Specification pricing'
   return (
     <section
       className='market-route-card bg-card min-w-0 overflow-hidden rounded-2xl border'
@@ -160,7 +164,7 @@ function RouteCard(props: {
           {t(
             route.rows.some((row) => row.tokenRates.length)
               ? 'Token pricing'
-              : 'Specification pricing'
+              : pricingLabel
           )}
         </Badge>
         <CopyButton
@@ -169,6 +173,13 @@ function RouteCard(props: {
           value={[
             route.provider,
             route.sku,
+            ...(props.referenceOnly
+              ? [
+                  t(
+                    'Reference prices for a 1-second video; request a live quote for your actual video.'
+                  ),
+                ]
+              : []),
             ...route.rows.flatMap((row) =>
               row.tokenRates.length &&
               (props.type === 'chat' || row.estimate?.nativeUnit === 'tokens')
@@ -229,7 +240,9 @@ function RouteCard(props: {
         <TableHeader>
           <TableRow>
             <TableHead className='pl-5'>{t('Specification')}</TableHead>
-            <TableHead className='text-right'>{t('Sale price')}</TableHead>
+            <TableHead className='text-right'>
+              {t(props.referenceOnly ? 'Reference price' : 'Sale price')}
+            </TableHead>
             <TableHead>{t('Billing unit')}</TableHead>
           </TableRow>
         </TableHeader>
@@ -291,7 +304,9 @@ function RouteCard(props: {
                     : '—'}
                 </TableCell>
               </TableRow>,
-              row.estimate && row.estimate.nativeUnit !== 'call' ? (
+              !props.referenceOnly &&
+              row.estimate &&
+              row.estimate.nativeUnit !== 'call' ? (
                 <TableRow key={`${row.key}:estimate`} className='bg-muted/30'>
                   <TableCell className='pl-5 text-xs'>
                     {t('Estimated total')}
@@ -309,33 +324,39 @@ function RouteCard(props: {
           {!route.rows.length && (
             <TableRow>
               <TableCell colSpan={3}>
-                {t('Price temporarily unavailable')}
+                {t(
+                  props.referenceOnly
+                    ? 'Quoted per video before each task'
+                    : 'Price temporarily unavailable'
+                )}
               </TableCell>
             </TableRow>
           )}
         </TableBody>
       </Table>
-      <div className='flex flex-wrap items-center gap-3 border-t px-5 py-3 text-xs'>
-        <span className='text-muted-foreground'>
-          {t('Route success rate (1h)')}
-        </span>
-        <strong
-          className={
-            route.successRate != null && route.successRate >= 90
-              ? 'text-emerald-600 dark:text-emerald-400'
-              : ''
-          }
-        >
-          {props.statisticsAvailable && route.successRate != null
-            ? `${amount(route.successRate)}%`
-            : t('No recent samples')}
-        </strong>
-        {props.statisticsAvailable && (
+      {!props.referenceOnly && (
+        <div className='flex flex-wrap items-center gap-3 border-t px-5 py-3 text-xs'>
           <span className='text-muted-foreground'>
-            {t('{{count}} samples', { count: route.samples })}
+            {t('Route success rate (1h)')}
           </span>
-        )}
-      </div>
+          <strong
+            className={
+              route.successRate != null && route.successRate >= 90
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : ''
+            }
+          >
+            {props.statisticsAvailable && route.successRate != null
+              ? `${amount(route.successRate)}%`
+              : t('No recent samples')}
+          </strong>
+          {props.statisticsAvailable && (
+            <span className='text-muted-foreground'>
+              {t('{{count}} samples', { count: route.samples })}
+            </span>
+          )}
+        </div>
+      )}
       {(route.variants.length > 1 || route.fields.length > 0) && (
         <Collapsible className='border-t'>
           <CollapsibleTrigger className='text-muted-foreground flex w-full items-center justify-between px-5 py-3 text-xs'>
@@ -446,7 +467,7 @@ export function ModelPrices(props: { model: string }) {
           </span>
         </div>
       </div>
-      {!data.statisticsAvailable && (
+      {!data.liveQuote && !data.statisticsAvailable && (
         <p role='status' className='text-muted-foreground text-sm'>
           {t(
             'Statistics are temporarily unavailable; prices are still available.'
@@ -461,7 +482,9 @@ export function ModelPrices(props: { model: string }) {
             })}
           </strong>
           <Badge variant='secondary'>
-            {t('{{count}} priced routes', { count: data.routes.length })}
+            {data.liveQuote
+              ? t('Quoted per video before each task')
+              : t('{{count}} priced routes', { count: data.routes.length })}
           </Badge>
           {data.unavailable.length > 0 && (
             <Badge variant='outline'>
@@ -499,6 +522,13 @@ export function ModelPrices(props: { model: string }) {
           </SelectContent>
         </Select>
       </div>
+      {data.liveQuote && (
+        <p className='text-muted-foreground text-sm'>
+          {t(
+            'Reference prices for a 1-second video; request a live quote for your actual video.'
+          )}
+        </p>
+      )}
       <div className='grid grid-cols-1 items-start gap-4'>
         {orderedRoutes.map((route) => (
           <RouteCard
@@ -506,6 +536,7 @@ export function ModelPrices(props: { model: string }) {
             route={route}
             type={data.model.type}
             statisticsAvailable={data.statisticsAvailable}
+            referenceOnly={data.liveQuote}
             onChange={(variantIndex, values) =>
               setSelections((previous) => ({
                 ...previous,
@@ -539,11 +570,16 @@ export function ModelPrices(props: { model: string }) {
       <footer className='bg-background/95 sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t py-4 text-xs backdrop-blur'>
         <div className='text-muted-foreground flex flex-wrap gap-x-6 gap-y-2'>
           <span>
-            {t('Daily price book')} · {date(data.lockedAt)}
+            {t(
+              data.liveQuote ? 'Reference prices checked' : 'Daily price book'
+            )}{' '}
+            · {date(data.lockedAt)}
           </span>
-          <span>
-            {t('Valid until')} · {date(data.validUntil)} · UTC+8
-          </span>
+          {!data.liveQuote && (
+            <span>
+              {t('Valid until')} · {date(data.validUntil)} · UTC+8
+            </span>
+          )}
         </div>
         <Button
           size='sm'
