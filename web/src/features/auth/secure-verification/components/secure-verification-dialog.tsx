@@ -243,6 +243,16 @@ export function SecureVerificationDialog(props: SecureVerificationDialogProps) {
                 </p>
               </TabsContent>
               <TabsContent value='oauth' className='space-y-2'>
+                {verifying && input.method === 'oauth' && (
+                  <p role='status' className='text-sm'>
+                    {t('Verifying your {{provider}} account', {
+                      provider:
+                        ready.requirements.oauth_providers.find(
+                          (provider) => provider.slug === input.provider
+                        )?.name ?? input.provider,
+                    })}
+                  </p>
+                )}
                 <p className='text-muted-foreground text-sm'>
                   {t(
                     'Continue with an account already linked to your profile.'

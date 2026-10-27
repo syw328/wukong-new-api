@@ -82,6 +82,63 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+it('starts linked-account verification from the Verify button and reports a blocked popup', async () => {
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        ...passwordRequirements,
+        methods: [{ method: 'oauth', available: true }],
+        oauth_providers: [{ slug: 'baizhu', name: '白猪AI' }],
+      },
+    },
+  })
+  const open = vi.spyOn(window, 'open').mockReturnValue(null)
+  const result = vi.fn()
+  const user = userEvent.setup()
+  render(<Harness onResult={result} />)
+  await user.click(screen.getByText('Protected action'))
+  await screen.findByRole('button', { name: '白猪AI' })
+  await user.click(screen.getByRole('button', { name: 'Verify' }))
+  expect(open).toHaveBeenCalledTimes(1)
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'OAuth pop-up was blocked'
+  )
+  expect(result).not.toHaveBeenCalled()
+})
+
+it('shows which linked account is being verified while authorization is pending', async () => {
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        ...passwordRequirements,
+        methods: [{ method: 'oauth', available: true }],
+        oauth_providers: [{ slug: 'platform', name: '白猪AI' }],
+      },
+    },
+  })
+  vi.spyOn(api, 'post').mockReturnValue(new Promise(() => undefined))
+  const close = vi.fn()
+  vi.spyOn(window, 'open').mockReturnValue({
+    closed: false,
+    close,
+  } as unknown as Window)
+  const user = userEvent.setup()
+  const result = vi.fn()
+  render(<Harness onResult={result} />)
+  await user.click(screen.getByText('Protected action'))
+  await screen.findByRole('button', { name: '白猪AI' })
+  await user.click(screen.getByRole('button', { name: 'Verify' }))
+  expect(await screen.findByRole('status')).toHaveTextContent(
+    'Verifying your 白猪AI account'
+  )
+  expect(screen.getByRole('button', { name: 'Verify' })).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: 'Cancel' }))
+  expect(close).toHaveBeenCalledTimes(1)
+  expect(result).toHaveBeenCalledWith(null)
+})
+
 function LoginHarness(props: {
   onResult: (bundle: AuthBundle | null) => void
 }) {

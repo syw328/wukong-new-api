@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { SystemStatus } from '@/features/auth/types'
+import { portalPagePath, portalRuntime } from '@/lib/portal-runtime'
 
 // ============================================================================
 // OAuth URL Builders
@@ -118,11 +119,15 @@ export function buildOAuthAuthorizationUrl(
         (candidate) => candidate.slug === provider
       )
       if (custom) {
-        const url = new URL(custom.authorization_endpoint)
+        const url = new URL(
+          provider === 'platform' && portalRuntime().basePath
+            ? `${window.location.origin}/api/oauth/authorize`
+            : custom.authorization_endpoint
+        )
         url.searchParams.set('client_id', custom.client_id)
         url.searchParams.set(
           'redirect_uri',
-          `${window.location.origin}/oauth/${provider}`
+          `${window.location.origin}${portalPagePath(`/oauth/${provider}`)}`
         )
         url.searchParams.set('response_type', 'code')
         url.searchParams.set('state', state)

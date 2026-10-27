@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { initializeFrontendCache } from '@/lib/frontend-cache'
+import { buildOAuthAuthorizationUrl } from '@/lib/oauth'
 import {
   portalApiOrigin,
   portalLocalStorage,
@@ -27,6 +28,38 @@ function mountedPortal(): void {
 }
 
 describe('mounted portal paths and storage', () => {
+  it.each([false, true])(
+    'uses the correct linked-account callback for mounted portal: %s',
+    (mounted) => {
+      if (mounted) mountedPortal()
+      const url = new URL(
+        buildOAuthAuthorizationUrl('platform', 'verification-state', {
+          custom_oauth_providers: [
+            {
+              id: 1,
+              slug: 'platform',
+              name: 'Platform',
+              icon: '',
+              client_id: 'test-client',
+              authorization_endpoint:
+                'https://configured.example/api/oauth/authorize',
+              scopes: 'profile',
+            },
+          ],
+        })
+      )
+      expect(url.searchParams.get('redirect_uri')).toBe(
+        `${window.location.origin}${mounted ? '/api' : ''}/oauth/platform`
+      )
+      expect(url.origin).toBe(
+        mounted ? window.location.origin : 'https://configured.example'
+      )
+      expect(url.pathname).toBe('/api/oauth/authorize')
+      expect(url.searchParams.get('state')).toBe('verification-state')
+      expect(url.searchParams.get('client_id')).toBe('test-client')
+    }
+  )
+
   it('keeps root deployments compatible and mounts pages and APIs independently', () => {
     expect(portalPagePath('/pricing')).toBe('/pricing')
     expect(portalRequestPath('/api/user/self')).toBe('/api/user/self')
