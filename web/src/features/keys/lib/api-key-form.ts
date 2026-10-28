@@ -117,9 +117,10 @@ export const API_KEY_FORM_DEFAULT_VALUES: ApiKeyFormValues = {
   model_limits: [],
   model_limits_enabled: false,
   routing_policy: {
-    version: 1,
+    version: 2,
+    mode: 'automatic',
     default_strategy: 'balanced',
-    allowed_strategies: ['balanced', 'cheapest', 'fastest', 'most_reliable'],
+    allowed_strategies: ['balanced'],
     allow_fixed_routes: false,
     model_rules: [],
   },

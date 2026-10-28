@@ -330,6 +330,10 @@ func AddToken(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	if err := validateTokenRouteSelection(c, request.RoutingPolicy); err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	key, err := common.GenerateKey()
 	if err != nil {
 		common.ApiErrorI18n(c, i18n.MsgTokenGenerateFailed)
@@ -468,6 +472,17 @@ func UpdateToken(c *gin.Context) {
 			if !setTokenAutoGroups(c, cleanToken, request.AutoGroups.Groups) {
 				return
 			}
+		}
+	}
+	if cleanToken.RoutingPolicy != previous.RoutingPolicy || cleanToken.Group != previous.Group {
+		policy, policyErr := cleanToken.GetRoutingPolicy()
+		if policyErr != nil {
+			common.ApiError(c, policyErr)
+			return
+		}
+		if err := validateTokenRouteSelection(c, policy); err != nil {
+			common.ApiError(c, err)
+			return
 		}
 	}
 	err = cleanToken.Update()

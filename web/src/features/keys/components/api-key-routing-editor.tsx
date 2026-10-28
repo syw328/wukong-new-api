@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useId, useState } from 'react'
+import { useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 
@@ -25,384 +25,283 @@ import {
   SideDrawerSection,
   SideDrawerSectionHeader,
 } from '@/components/drawer-layout'
-import { MultiSelect } from '@/components/multi-select'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Switch } from '@/components/ui/switch'
 
 import { ROUTING_STRATEGY_LABELS as labels } from '../constants'
 import type { ApiKeyFormValues } from '../lib/api-key-form'
+import {
+  newRoutingPolicy,
+  changeRoutingStrategy,
+  routingStrategies,
+  routingDescriptions,
+  routingDraftValid,
+} from '../lib/routing-policy'
 import type { KeyRoutingPolicy, RoutingStrategy } from '../types'
+import { KeyRoutePicker } from './key-route-picker'
+import { ModelRoutingRule, RoutingAdvanced } from './key-routing-settings'
 
-const strategies: RoutingStrategy[] = [
-  'balanced',
-  'cheapest',
-  'fastest',
-  'most_reliable',
-]
-const initialPolicy = (): KeyRoutingPolicy => ({
-  version: 1,
-  default_strategy: 'balanced',
-  allowed_strategies: [...strategies],
-  allow_fixed_routes: false,
-  model_rules: [],
-})
+import '@/styles/platform-market.css'
+import '@/styles/key-routing.css'
 
-type StrategyProps = {
-  value: RoutingStrategy
-  allowed: RoutingStrategy[]
-  onChange: (value: RoutingStrategy) => void
-  label: string
-}
-function StrategySelect(props: StrategyProps) {
-  const { t } = useTranslation()
-  return (
-    <NativeSelect
-      aria-label={props.label}
-      value={props.value}
-      onChange={(event) =>
-        props.onChange(event.target.value as RoutingStrategy)
-      }
-      className='w-full'
-    >
-      {props.allowed.map((strategy) => (
-        <NativeSelectOption key={strategy} value={strategy}>
-          {t(labels[strategy])}
-        </NativeSelectOption>
-      ))}
-    </NativeSelect>
-  )
-}
-function StrategyPermissions(props: {
-  value: RoutingStrategy[]
-  onChange: (value: RoutingStrategy[]) => void
-  label: string
-}) {
-  const { t } = useTranslation()
-  return (
-    <div
-      role='group'
-      aria-label={props.label}
-      className='grid grid-cols-2 gap-3'
-    >
-      {strategies.map((strategy) => (
-        <Label
-          key={strategy}
-          className='flex items-center gap-2 text-sm font-normal'
-        >
-          <Checkbox
-            checked={props.value.includes(strategy)}
-            disabled={
-              props.value.length === 1 && props.value.includes(strategy)
-            }
-            onCheckedChange={(checked) =>
-              props.onChange(
-                checked
-                  ? [...props.value, strategy]
-                  : props.value.filter((item) => item !== strategy)
-              )
-            }
-          />
-          {t(labels[strategy])}
-        </Label>
-      ))}
-    </div>
-  )
-}
 export function ApiKeyRoutingEditor(props: {
   form: UseFormReturn<ApiKeyFormValues>
   models: string[]
 }) {
   const { t } = useTranslation()
-  const id = useId()
   const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState<KeyRoutingPolicy>(initialPolicy)
+  const [step, setStep] = useState(1)
+  const [initialDraft, setInitialDraft] = useState('')
+  const [draft, setDraft] = useState<KeyRoutingPolicy>(newRoutingPolicy)
   const [restricted, setRestricted] = useState(false)
-  const [selectedModels, setSelectedModels] = useState<string[]>([])
-  const [ruleModel, setRuleModel] = useState('')
+  const [selected, setSelected] = useState<string[]>([])
+  const [active, setActive] = useState('')
   const policy = props.form.watch('routing_policy')
   const limited = props.form.watch('model_limits_enabled')
   const limits = props.form.watch('model_limits')
-  const models = [
-    ...new Set([
-      ...props.models.map((model) => model.replace(/^platform-media:/, '')),
-      ...limits,
-    ]),
-  ].sort()
-  const ruleModels = restricted ? selectedModels : models
-  const editedRule = draft.model_rules.find((rule) => rule.model === ruleModel)
-  const effective = editedRule ?? draft
-  const begin = () => {
-    setDraft(
-      structuredClone(
-        policy ?? { ...initialPolicy(), allow_fixed_routes: true }
-      )
+  const custom = policy?.mode === 'custom'
+  const selectedMode = custom ? 'custom' : policy?.default_strategy
+  function begin(makeCustom = false) {
+    const next = structuredClone(
+      policy || {
+        ...newRoutingPolicy(),
+        allowed_strategies: [...routingStrategies],
+        allow_fixed_routes: true,
+      }
     )
-    setRestricted(limited)
-    setSelectedModels([...limits])
-    setRuleModel('')
+    if (makeCustom && next.mode !== 'custom') {
+      next.version = 2
+      next.mode = 'custom'
+      next.model_rules = []
+    }
+    setInitialDraft(JSON.stringify(next))
+    setDraft(next)
+    setRestricted(makeCustom || limited)
+    setSelected([...limits])
+    setActive(limits[0] || '')
+    setStep(1)
     setOpen(true)
   }
-  const updateRule = (
-    allowed: RoutingStrategy[],
-    defaultStrategy: RoutingStrategy
-  ) => {
-    if (!ruleModel) return
-    setDraft({
-      ...draft,
-      model_rules: [
-        ...draft.model_rules.filter((rule) => rule.model !== ruleModel),
-        {
-          model: ruleModel,
-          allowed_strategies: allowed,
-          default_strategy: defaultStrategy,
-        },
-      ],
+  function choose(strategy: RoutingStrategy) {
+    const next = changeRoutingStrategy(policy || newRoutingPolicy(), strategy)
+    next.mode = 'automatic'
+    if (custom) next.model_rules = []
+    props.form.setValue('routing_policy', next, {
+      shouldDirty: true,
+      shouldValidate: true,
     })
   }
-  const apply = () => {
+  function apply() {
     props.form.setValue('model_limits_enabled', restricted, {
       shouldDirty: true,
     })
-    props.form.setValue('model_limits', selectedModels, { shouldDirty: true })
-    props.form.setValue(
-      'routing_policy',
-      {
-        ...draft,
-        model_rules: draft.model_rules.filter(
-          (rule) => !restricted || selectedModels.includes(rule.model)
-        ),
-      },
-      { shouldDirty: true, shouldValidate: true }
-    )
+    props.form.setValue('model_limits', selected, { shouldDirty: true })
+    if (
+      policy ||
+      JSON.stringify(draft) !== initialDraft ||
+      draft.mode === 'custom'
+    ) {
+      props.form.setValue(
+        'routing_policy',
+        {
+          ...draft,
+          model_rules: draft.model_rules.filter(
+            (rule) => !restricted || selected.includes(rule.model)
+          ),
+        },
+        { shouldDirty: true, shouldValidate: true }
+      )
+    }
     setOpen(false)
   }
+  const valid = routingDraftValid(draft, restricted, selected)
   return (
     <SideDrawerSection>
       <SideDrawerSectionHeader
-        title={t('Routing and model permissions')}
-        description={t('Choose how this key selects compatible channels.')}
-      />
-      <Label htmlFor={id}>{t('Default routing strategy')}</Label>
-      <NativeSelect
-        id={id}
-        className='w-full'
-        value={policy?.default_strategy ?? ''}
-        onChange={(event) => {
-          const next = structuredClone(policy ?? initialPolicy())
-          next.default_strategy = event.target.value as RoutingStrategy
-          props.form.setValue('routing_policy', next, { shouldDirty: true })
-        }}
-      >
-        {!policy && (
-          <NativeSelectOption value='' disabled>
-            {t('Keep existing routing behavior')}
-          </NativeSelectOption>
+        title={t('Routing strategy')}
+        description={t(
+          'Choose a default. Customize models and routes when you need more control.'
         )}
-        {(policy?.allowed_strategies ?? strategies).map((strategy) => (
-          <NativeSelectOption key={strategy} value={strategy}>
-            {t(labels[strategy])}
-          </NativeSelectOption>
+      />
+      <div
+        className='key-strategy-grid'
+        role='group'
+        aria-label={t('Routing strategy')}
+      >
+        {[...routingStrategies, 'custom' as const].map((value) => (
+          <Button
+            key={value}
+            type='button'
+            variant='outline'
+            className='key-strategy-card'
+            aria-pressed={selectedMode === value}
+            onClick={() => (value === 'custom' ? begin(true) : choose(value))}
+          >
+            <span className='key-strategy-indicator' aria-hidden />
+            <span>
+              <strong>
+                {t(value === 'custom' ? 'Custom routes' : labels[value])}
+              </strong>
+              <small>{t(routingDescriptions[value])}</small>
+            </span>
+          </Button>
         ))}
-      </NativeSelect>
-      <p className='text-muted-foreground text-xs'>
-        {limited
-          ? t('{{count}} models allowed', { count: limits.length })
-          : t('All available models allowed')}{' '}
-        ·{' '}
-        {t('{{count}} model strategy rules', {
-          count: policy?.model_rules.length ?? 0,
-        })}
-      </p>
-      <Button type='button' variant='outline' onClick={begin}>
-        {t('Configure model and strategy permissions')}
-      </Button>
+      </div>
+      {!policy && (
+        <p className='text-muted-foreground text-xs'>
+          {t('Keep existing routing behavior')}
+        </p>
+      )}
+      <div className='key-routing-summary'>
+        <span>
+          {limited
+            ? t('{{count}} models allowed', { count: limits.length })
+            : t('All available models allowed')}
+        </span>
+        <span>
+          {custom
+            ? t('{{count}} routes selected', {
+                count: policy.model_rules.reduce(
+                  (sum, rule) => sum + (rule.route_ids?.length || 0),
+                  0
+                ),
+              })
+            : t('{{count}} model strategy rules', {
+                count: policy?.model_rules.length || 0,
+              })}
+        </span>
+        <Button type='button' variant='link' onClick={() => begin(custom)}>
+          {t('Configure models and routes')}
+        </Button>
+      </div>
+      {custom && (
+        <div className='grid gap-2'>
+          {policy.model_rules.map((rule) => (
+            <div
+              key={rule.model}
+              className='flex flex-wrap justify-between gap-2 rounded-lg border px-3 py-2 text-xs'
+            >
+              <strong className='break-all'>{rule.model}</strong>
+              <span>
+                {t('{{count}} routes selected', {
+                  count: rule.route_ids?.length || 0,
+                })}{' '}
+                ·{' '}
+                {t(
+                  rule.route_order === 'manual'
+                    ? 'Use manual route order'
+                    : labels[rule.default_strategy]
+                )}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       <Dialog
         open={open}
         onOpenChange={setOpen}
-        title={t('Model and strategy permissions')}
-        description={t('Changes apply to this key after you save the key.')}
+        title={t(
+          draft.mode === 'custom' ? 'Custom model routing' : 'Model permissions'
+        )}
+        description={t(
+          'Apply configuration, then save the key to activate changes.'
+        )}
+        contentClassName='key-routing-dialog'
+        bodyClassName='key-routing-dialog-body'
         footer={
           <>
+            <span className='text-muted-foreground mr-auto text-xs'>
+              {t('{{count}} models selected', { count: selected.length })}
+              {!valid && ` · ${t('Select at least one route for each model')}`}
+            </span>
             <Button
               type='button'
               variant='outline'
-              onClick={() => setOpen(false)}
+              onClick={() => (step === 2 ? setStep(1) : setOpen(false))}
             >
-              {t('Cancel')}
+              {t(step === 2 ? 'Back' : 'Cancel')}
             </Button>
-            <Button
-              type='button'
-              disabled={restricted && selectedModels.length === 0}
-              onClick={apply}
-            >
-              {t('Apply permissions')}
-            </Button>
+            {step === 1 && draft.mode === 'custom' ? (
+              <Button
+                type='button'
+                disabled={!valid}
+                onClick={() => setStep(2)}
+              >
+                {t('Next: routing order')}
+              </Button>
+            ) : (
+              <Button type='button' disabled={!valid} onClick={apply}>
+                {t('Apply configuration')}
+              </Button>
+            )}
           </>
         }
       >
-        <div className='flex flex-col gap-6'>
-          <div className='space-y-3'>
-            <Label className='flex items-center justify-between'>
-              {t('Allow selected models only')}
-              <Switch checked={restricted} onCheckedChange={setRestricted} />
-            </Label>
-            {restricted && (
-              <MultiSelect
-                options={models.map((model) => ({
-                  value: model,
-                  label: model,
-                }))}
-                selected={selectedModels}
-                onChange={(next) => {
-                  setSelectedModels(next)
-                  if (!next.includes(ruleModel)) setRuleModel('')
-                }}
-                placeholder={t('Select at least one model')}
-                maxVisibleChips={6}
+        {draft.mode === 'custom' && (
+          <div className='key-routing-steps'>
+            <span data-active={step === 1}>1. {t('Models and routes')}</span>
+            <span data-active={step === 2}>2. {t('Routing order')}</span>
+          </div>
+        )}
+        {draft.mode !== 'custom' && (
+          <Label className='mb-5 flex items-center justify-between'>
+            {t('Allow selected models only')}
+            <Switch checked={restricted} onCheckedChange={setRestricted} />
+          </Label>
+        )}
+        {step === 1 && (restricted || draft.mode === 'custom') && (
+          <KeyRoutePicker
+            policy={draft}
+            models={selected}
+            eligible={props.models.map((model) =>
+              model.replace(/^platform-media:/, '')
+            )}
+            activeModel={active}
+            onActiveModel={setActive}
+            onChange={(next, models) => {
+              setDraft(next)
+              setSelected(models)
+            }}
+          />
+        )}
+        {step === 2 && (
+          <div className='grid gap-4 lg:grid-cols-2'>
+            {selected.map((model) => (
+              <ModelRoutingRule
+                key={model}
+                model={model}
+                policy={draft}
+                onChange={setDraft}
               />
-            )}
-            <p className='text-muted-foreground text-xs'>
-              {t(
-                'Models outside this list are rejected before generation. New models are not automatically included when restricted.'
-              )}
-            </p>
+            ))}
           </div>
-          <div className='space-y-3'>
-            <Label>{t('Default allowed strategies')}</Label>
-            <StrategyPermissions
-              value={draft.allowed_strategies}
-              label={t('Default allowed strategies')}
-              onChange={(allowed) =>
-                setDraft({
-                  ...draft,
-                  allowed_strategies: allowed,
-                  default_strategy: allowed.includes(draft.default_strategy)
-                    ? draft.default_strategy
-                    : allowed[0],
-                })
-              }
-            />
-            <StrategySelect
-              label={t('Default routing strategy')}
-              value={draft.default_strategy}
-              allowed={draft.allowed_strategies}
-              onChange={(value) =>
-                setDraft({ ...draft, default_strategy: value })
-              }
-            />
-          </div>
-          <div className='space-y-3 rounded-lg border p-4'>
-            <Label>{t('Per-model strategy overrides')}</Label>
-            <p className='text-muted-foreground text-xs'>
-              {t(
-                'An override replaces the default strategy permissions for this model. Other models inherit the defaults.'
-              )}
-            </p>
-            <MultiSelect
-              options={ruleModels.map((model) => ({
-                value: model,
-                label: model,
-              }))}
-              selected={ruleModel ? [ruleModel] : []}
-              onChange={(next) => setRuleModel(next.at(-1) ?? '')}
-              placeholder={t('Choose a model to configure')}
-            />
-            {ruleModel && (
-              <>
-                <StrategyPermissions
-                  label={t('Allowed strategies for {{model}}', {
-                    model: ruleModel,
-                  })}
-                  value={effective.allowed_strategies}
-                  onChange={(allowed) =>
-                    updateRule(
-                      allowed,
-                      allowed.includes(effective.default_strategy)
-                        ? effective.default_strategy
-                        : allowed[0]
-                    )
-                  }
-                />
-                <StrategySelect
-                  label={t('Default strategy for {{model}}', {
-                    model: ruleModel,
-                  })}
-                  value={effective.default_strategy}
-                  allowed={effective.allowed_strategies}
-                  onChange={(value) =>
-                    updateRule(effective.allowed_strategies, value)
-                  }
-                />
-                {editedRule && (
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='sm'
-                    onClick={() =>
-                      setDraft({
-                        ...draft,
-                        model_rules: draft.model_rules.filter(
-                          (rule) => rule.model !== ruleModel
-                        ),
-                      })
-                    }
-                  >
-                    {t('Restore key defaults')}
-                  </Button>
-                )}
-              </>
-            )}
-            {draft.model_rules
-              .filter(
-                (rule) => !restricted || selectedModels.includes(rule.model)
-              )
-              .map((rule) => (
-                <div
-                  key={rule.model}
-                  className='flex items-center justify-between gap-2 text-xs'
-                >
-                  <span className='min-w-0 break-all'>
-                    {rule.model} ·{' '}
-                    {rule.allowed_strategies
-                      .map((strategy) => t(labels[strategy]))
-                      .join(' / ')}
-                  </span>
-                  <Button
-                    type='button'
-                    size='sm'
-                    variant='ghost'
-                    onClick={() => setRuleModel(rule.model)}
-                  >
-                    {t('Edit')}
-                  </Button>
-                </div>
-              ))}
-          </div>
-          <div className='space-y-2'>
-            <Label className='flex items-center justify-between'>
-              {t('Allow fixed-route requests')}
-              <Switch
-                checked={draft.allow_fixed_routes}
-                onCheckedChange={(checked) =>
-                  setDraft({ ...draft, allow_fixed_routes: checked })
-                }
+        )}
+        {draft.mode !== 'custom' &&
+          draft.model_rules
+            .filter((rule) => !restricted || selected.includes(rule.model))
+            .map((rule) => (
+              <ModelRoutingRule
+                key={rule.model}
+                model={rule.model}
+                policy={draft}
+                onChange={setDraft}
               />
-            </Label>
-            <p className='text-muted-foreground text-xs'>
-              {t(
-                'Automatic strategies apply to Chat Completions and media generation. Fixed route_id and native Responses require this permission and do not switch channels.'
-              )}
-            </p>
+            ))}
+        {(draft.mode !== 'custom' || step === 2) && (
+          <div className='mt-5'>
+            <RoutingAdvanced
+              fixedOnly={draft.mode === 'custom'}
+              policy={draft}
+              onChange={setDraft}
+            />
           </div>
-          <p className='text-muted-foreground text-xs'>
-            {t(
-              'Retries use compatible, authorized channels in the selected order. Uncertain submissions are recovered first; policy rejections do not retry.'
-            )}
-          </p>
-        </div>
+        )}
+        <p className='text-muted-foreground mt-4 text-xs'>
+          {t(
+            'Unavailable routes are skipped. If no selected route works, the request fails without using an unselected route.'
+          )}
+        </p>
       </Dialog>
     </SideDrawerSection>
   )

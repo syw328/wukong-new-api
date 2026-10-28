@@ -75,3 +75,25 @@ export function usePlatformSummaries(models: string[]) {
     retry: false,
   })
 }
+
+export function useRoutingOptions(model: string) {
+  const userId = useAuthStore((state) => state.auth.user?.id ?? 'anonymous')
+  return useQuery({
+    queryKey: ['key-routing-options', portalRuntime().origin, userId, model],
+    queryFn: async ({ signal }) => {
+      const result = await api.get<{
+        success: boolean
+        data: {
+          model: PlatformModel
+          routes: import('./route-option-card').RouteOption[]
+        }
+      }>(`/api/token/routing-options?model=${encodeURIComponent(model)}`, {
+        signal,
+      })
+      return requireServerSuccess(result.data).data
+    },
+    enabled: Boolean(model),
+    staleTime: 20_000,
+    retry: false,
+  })
+}

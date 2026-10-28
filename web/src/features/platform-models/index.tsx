@@ -1,13 +1,10 @@
 // Copyright (C) 2026 QuantumNous and contributors. AGPL-3.0-or-later.
 import {
   ArrowDownWideNarrow,
-  Boxes,
-  Code2,
   LayoutGrid,
   List,
   Search,
   SlidersHorizontal,
-  Sparkles,
   X,
 } from 'lucide-react'
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
@@ -126,62 +123,17 @@ export function PlatformModelsPage(props: {
       <main
         className={`market-page ${prices ? 'market-prices-page' : 'market-catalog-page'}`}
       >
-        <header className='market-hero'>
-          <div className='market-hero-content'>
-            <div className='market-eyebrow'>
-              <span className='market-status-dot' />
-              <span>{t('A universe of models. One API.')}</span>
-            </div>
-            <h1>
-              {t(prices ? 'Model Prices' : 'Model Square')}
-              <span className='market-title-dot'>.</span>
-            </h1>
-            <p className='market-hero-description'>
-              {t(
-                prices
-                  ? 'Every route, clearly priced. Compare starting prices, billing methods and reliability before you connect.'
-                  : 'Find your next creative engine. Explore language, images, video and audio in one place.'
-              )}
+        <header className='market-header'>
+          <div>
+            <h1>{t(prices ? 'Model Prices' : 'Model Square')}</h1>
+            <p>
+              {t('Compare models and choose the routes that fit your work.')}
             </p>
-            <div className='market-hero-stats'>
-              <span>
-                <b>{models.length}</b> {t('Models available')}
-              </span>
-              <span className='market-stat-divider' />
-              <span>
-                <b>{vendorCount}</b> {t('Manufacturers')}
-              </span>
-              <span className='market-stat-divider' />
-              <span>
-                <Code2 className='size-4' aria-hidden />
-                {t('Unified API access')}
-              </span>
-            </div>
           </div>
-          <div className='market-hero-art' aria-hidden='true'>
-            <div className='market-orbit' />
-            <div className='market-art-layer layer-back' />
-            <div className='market-art-layer layer-middle' />
-            <div className='market-art-layer layer-front'>
-              <div className='market-art-top'>
-                <Boxes size={26} />
-                <span>API / 01</span>
-              </div>
-              <div className='market-art-symbol'>
-                <Code2 size={72} strokeWidth={1.3} />
-              </div>
-              <div className='market-art-bottom'>
-                <span className='market-art-bar' />
-                <span>CONNECTED</span>
-                <Sparkles size={14} />
-              </div>
-            </div>
-            <div className='market-art-chip chip-top'>
-              <span />
-              AI
-            </div>
-            <div className='market-art-chip chip-bottom'>∞</div>
-          </div>
+          <span className='market-header-count'>
+            {t('{{count}} models', { count: models.length })} ·{' '}
+            {t('{{count}} manufacturers', { count: vendorCount })}
+          </span>
         </header>
         <div className='market-search-row'>
           <div className='market-search'>

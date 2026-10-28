@@ -101,6 +101,9 @@ describe('marketplace browsing', () => {
   it('combines manufacturer and model-type filters and resets the result set', async () => {
     render(<PlatformModelsPage />)
     const vendors = screen.getByRole('group', { name: 'Manufacturers' })
+    fireEvent.click(
+      within(vendors).getByRole('button', { name: 'Manufacturers' })
+    )
     fireEvent.click(within(vendors).getByRole('button', { name: /Google/ }))
     expect(
       screen.queryByRole('button', { name: 'View model Atlas Chat' })
@@ -111,10 +114,15 @@ describe('marketplace browsing', () => {
     fireEvent.click(
       within(screen.getByRole('group', { name: 'Model category' })).getByRole(
         'button',
-        { name: /Language models/ }
+        { name: /Image models/ }
       )
     )
-    expect(screen.getByText('No matching models')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'View model Canvas Image' })
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /Language models/ })
+    ).not.toBeInTheDocument()
     fireEvent.click(screen.getAllByRole('button', { name: 'Reset filters' })[0])
     expect(
       screen.getByRole('button', { name: 'View model Atlas Chat' })

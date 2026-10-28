@@ -161,7 +161,7 @@ export function MarketMetrics(props: { summary?: ModelSummary }) {
       >
         <Network className='size-3.5 shrink-0' aria-hidden />
         {data
-          ? t('{{count}} routes', { count: data.routeCount })
+          ? t('{{count}} available routes', { count: data.pricedRouteCount })
           : t('Routes pending')}
       </span>
     </div>
@@ -208,7 +208,7 @@ export const MarketCard = memo(function MarketCard(props: {
         <div className='market-tags'>
           {model.tags.slice(0, 3).map((tag) => (
             <Badge key={tag} variant='secondary'>
-              {t(tag)}
+              {/^\d+(?:K|M|P)$/i.test(tag) ? tag : t(tag)}
             </Badge>
           ))}
         </div>

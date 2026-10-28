@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { modelCategory } from './helpers'
-import { MarketMetrics, MarketModelIcon, MarketPrice } from './market-card'
+import { MarketModelIcon } from './market-card'
 import { ModelApi } from './model-api'
 import { ModelPrices } from './model-prices'
 import { TYPE_LABELS, type ModelSummary, type PlatformModel } from './types'
@@ -62,7 +62,7 @@ export function ModelDetailsDialog(props: {
                 </Badge>
                 {model.tags.slice(0, 8).map((tag) => (
                   <Badge key={tag} variant='secondary'>
-                    {t(tag)}
+                    {/^\d+(?:K|M|P)$/i.test(tag) ? tag : t(tag)}
                   </Badge>
                 ))}
                 <CopyButton
@@ -73,7 +73,7 @@ export function ModelDetailsDialog(props: {
                   {t('Copy model ID')}
                 </CopyButton>
               </div>
-              <p className='text-muted-foreground text-sm leading-6'>
+              <p className='text-muted-foreground line-clamp-2 text-sm leading-6'>
                 {model.description}
               </p>
               {!model.available && (
@@ -87,10 +87,6 @@ export function ModelDetailsDialog(props: {
                 </p>
               )}
             </div>
-            <div className='market-detail-summary'>
-              <MarketPrice summary={props.summary} />
-              <MarketMetrics summary={props.summary} />
-            </div>
           </div>
           <Tabs defaultValue='prices' className='market-detail-tabs'>
             <TabsList className='w-full'>
@@ -103,10 +99,10 @@ export function ModelDetailsDialog(props: {
                 {t('API connection')}
               </TabsTrigger>
             </TabsList>
-            <TabsContent value='prices' className='pt-5'>
+            <TabsContent value='prices' className='pt-3'>
               <ModelPrices model={model.id} />
             </TabsContent>
-            <TabsContent value='api' className='pt-5'>
+            <TabsContent value='api' className='pt-3'>
               <Button
                 variant='outline'
                 className='mb-4'

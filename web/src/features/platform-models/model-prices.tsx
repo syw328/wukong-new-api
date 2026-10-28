@@ -33,7 +33,15 @@ import {
 
 import { usePlatformPrices } from './api'
 import { formatPriceBookDate, routePriceOrder } from './helpers'
-import type { PriceField, PriceRoute, PriceSelections, Scalar } from './types'
+import { RouteOptionCard } from './route-option-card'
+import type {
+  PriceField,
+  PriceRoute,
+  PriceSelections,
+  Scalar,
+  BillingUnit,
+  StartingPrice,
+} from './types'
 
 const RATE_LABELS: Record<string, string> = {
   input: 'Input',
@@ -57,9 +65,7 @@ const FIELD_LABELS: Record<string, string> = {
 function amount(value: number | null | undefined): string {
   return value == null || !Number.isFinite(value) || value < 0
     ? '—'
-    : new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 }).format(
-        value
-      )
+    : String(value)
 }
 function PriceControl(props: {
   field: PriceField
@@ -147,266 +153,272 @@ function RouteCard(props: {
     if (nativeUnit === 'tokens') return t('1M tokens')
     return t(nativeUnit)
   }
-  const pricingLabel = props.referenceOnly
-    ? 'Reference price'
-    : 'Specification pricing'
+  const summary = routePriceOrder(route)
+  const startingPrice: StartingPrice | null = Number.isFinite(summary.amount)
+    ? {
+        amount: summary.amount,
+        unit: summary.unit as BillingUnit,
+        routeId: route.id,
+        variantIndex: route.variantIndex,
+        values: {},
+        input: route.rows[0]?.tokenRates.find((rate) => rate.label === 'input')
+          ?.amount,
+        output: route.rows[0]?.tokenRates.find(
+          (rate) => rate.label === 'output'
+        )?.amount,
+      }
+    : null
   return (
-    <section
-      className='market-route-card bg-card min-w-0 overflow-hidden rounded-2xl border'
-      aria-label={`${route.provider} ${route.sku}`}
-    >
-      <header className='flex flex-wrap items-center gap-2 border-b px-5 py-4'>
-        <strong className='text-sm'>{route.provider}</strong>
-        <span className='text-muted-foreground min-w-0 flex-1 text-xs break-all'>
-          {route.sku}
-        </span>
-        <Badge variant='secondary'>
-          {t(
-            route.rows.some((row) => row.tokenRates.length)
-              ? 'Token pricing'
-              : pricingLabel
-          )}
-        </Badge>
-        <CopyButton
-          size='sm'
-          aria-label={t('Copy route prices')}
-          value={[
-            route.provider,
-            route.sku,
-            ...(props.referenceOnly
-              ? [
-                  t(
-                    'Reference prices for a 1-second video; request a live quote for your actual video.'
-                  ),
-                ]
-              : []),
-            ...route.rows.flatMap((row) =>
-              row.tokenRates.length &&
-              (props.type === 'chat' || row.estimate?.nativeUnit === 'tokens')
-                ? row.tokenRates.map(
-                    (rate) =>
-                      `${t(row.name)} · ${t(RATE_LABELS[rate.label] || rate.label)}: ${amount(rate.amount)} ${t('credits')} / ${t('1M tokens')}`
-                  )
-                : [
-                    `${t(row.name)}: ${amount(row.estimate?.nativeUnit === 'call' ? row.estimate.amount : row.estimate?.unitPrice)} ${t('credits')} / ${unit(row.estimate?.nativeUnit || '')}`,
-                  ]
-            ),
-          ].join('\n')}
-        />
-      </header>
-      {props.type !== 'chat' && route.parameters && (
-        <div className='flex min-w-0 items-center gap-2 border-b px-5 py-3'>
-          <code className='min-w-0 flex-1 text-xs break-all'>
-            route_id: {route.id}
-          </code>
-          <CopyButton
-            value={route.id}
-            size='sm'
-            aria-label={t('Copy route ID')}
-          />
-        </div>
-      )}
-      {route.variants.length > 1 && (
-        <div
-          className='flex flex-wrap gap-2 border-b p-4'
-          role='group'
-          aria-label={t('Published specifications')}
-        >
-          {route.variants.map((variant) => (
-            <Button
-              key={variant.index}
-              variant={
-                variant.index === route.variantIndex ? 'secondary' : 'outline'
-              }
-              size='sm'
-              className='h-auto flex-col items-start gap-1 py-2 text-left text-xs whitespace-normal'
-              aria-pressed={variant.index === route.variantIndex}
-              onClick={() =>
-                props.onChange(variant.index, variant.price?.values || {})
-              }
-            >
-              <span>{t(variant.label)}</span>
-              {variant.price && (
-                <span className='font-mono text-[var(--market-amber)]'>
-                  {amount(variant.price.amount)} {t('credits')} /{' '}
-                  {unit(variant.price.unit)}
-                </span>
-              )}
-            </Button>
-          ))}
-        </div>
-      )}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className='pl-5'>{t('Specification')}</TableHead>
-            <TableHead className='text-right'>
-              {t(props.referenceOnly ? 'Reference price' : 'Sale price')}
-            </TableHead>
-            <TableHead>{t('Billing unit')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {route.rows.flatMap((row) => {
-            const tokenRows =
-              row.tokenRates.length &&
-              (props.type === 'chat' || row.estimate?.nativeUnit === 'tokens')
-            if (tokenRows) {
-              return [
-                ...row.tokenRates.map((rate) => (
-                  <TableRow key={`${row.key}:${rate.label}`}>
-                    <TableCell className='max-w-64 pl-5 text-xs whitespace-normal'>
-                      {t(row.name)} · {t(RATE_LABELS[rate.label] || rate.label)}
-                      {row.contextThreshold
-                        ? ` (≤ ${row.contextThreshold.toLocaleString()})`
-                        : ''}
-                    </TableCell>
-                    <TableCell className='text-right font-semibold text-amber-500 tabular-nums dark:text-amber-300'>
-                      {amount(rate.amount)}
-                    </TableCell>
-                    <TableCell className='text-muted-foreground text-xs'>
-                      {t('credits')} / {t('1M tokens')}
-                    </TableCell>
-                  </TableRow>
-                )),
-                ...row.longContextRates.map((rate) => (
-                  <TableRow key={`${row.key}:long:${rate.label}`}>
-                    <TableCell className='pl-5 text-xs whitespace-normal'>
-                      {t(row.name)} · {t(RATE_LABELS[rate.label] || rate.label)}{' '}
-                      (&gt; {row.contextThreshold?.toLocaleString()})
-                    </TableCell>
-                    <TableCell className='text-right font-semibold text-amber-500 tabular-nums dark:text-amber-300'>
-                      {amount(rate.amount)}
-                    </TableCell>
-                    <TableCell className='text-muted-foreground text-xs'>
-                      {t('credits')} / {t('1M tokens')}
-                    </TableCell>
-                  </TableRow>
-                )),
-              ]
-            }
-            let price = row.estimate?.unitPrice
-            if (row.estimate?.nativeUnit === 'call') price = row.estimate.amount
-            if (row.estimate?.nativeUnit === 'characters') {
-              price = row.characterUnit ?? undefined
-            }
-            return [
-              <TableRow key={row.key}>
-                <TableCell className='pl-5 text-xs whitespace-normal'>
-                  {t(row.name)}
-                </TableCell>
-                <TableCell className='text-right text-base font-semibold text-amber-500 tabular-nums dark:text-amber-300'>
-                  {amount(price)}
-                </TableCell>
-                <TableCell className='text-muted-foreground text-xs'>
-                  {row.estimate
-                    ? `${t('credits')} / ${unit(row.estimate.nativeUnit)}`
-                    : '—'}
-                </TableCell>
-              </TableRow>,
-              !props.referenceOnly &&
-              row.estimate &&
-              row.estimate.nativeUnit !== 'call' ? (
-                <TableRow key={`${row.key}:estimate`} className='bg-muted/30'>
-                  <TableCell className='pl-5 text-xs'>
-                    {t('Estimated total')}
-                  </TableCell>
-                  <TableCell className='text-right font-semibold'>
-                    {amount(row.estimate.amount)}
-                  </TableCell>
-                  <TableCell className='text-muted-foreground text-xs'>
-                    {t('credits')}
-                  </TableCell>
-                </TableRow>
-              ) : null,
-            ]
-          })}
-          {!route.rows.length && (
-            <TableRow>
-              <TableCell colSpan={3}>
-                {t(
-                  props.referenceOnly
-                    ? 'Quoted per video before each task'
-                    : 'Price temporarily unavailable'
-                )}
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-      {!props.referenceOnly && (
-        <div className='flex flex-wrap items-center gap-3 border-t px-5 py-3 text-xs'>
-          <span className='text-muted-foreground'>
-            {t('Route success rate (1h)')}
-          </span>
-          <strong
-            className={
-              route.successRate != null && route.successRate >= 90
-                ? 'text-emerald-600 dark:text-emerald-400'
-                : ''
-            }
-          >
-            {props.statisticsAvailable && route.successRate != null
-              ? `${amount(route.successRate)}%`
-              : t('No recent samples')}
-          </strong>
-          {props.statisticsAvailable && (
-            <span className='text-muted-foreground'>
-              {t('{{count}} samples', { count: route.samples })}
-            </span>
-          )}
-        </div>
-      )}
-      {(route.variants.length > 1 || route.fields.length > 0) && (
-        <Collapsible className='border-t'>
-          <CollapsibleTrigger className='text-muted-foreground flex w-full items-center justify-between px-5 py-3 text-xs'>
-            {t('Adjust specification')}
+    <section className='market-route-card min-w-0 overflow-hidden rounded-2xl border'>
+      <RouteOptionCard
+        chat={props.type === 'chat'}
+        route={{
+          ...route,
+          available: route.available ?? !!route.rows.length,
+          reason: route.reason || '',
+          successRate: props.statisticsAvailable ? route.successRate : null,
+          speed: route.speed || null,
+          startingPrice,
+        }}
+      />
+      <Collapsible>
+        <div className='flex items-center justify-between gap-3 px-4 py-2'>
+          <CollapsibleTrigger className='flex flex-1 items-center gap-2 text-left text-sm'>
+            {t('Specifications and full prices')}
             <ChevronDown className='size-4' />
           </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className='grid gap-4 px-5 pb-5 sm:grid-cols-2'>
-              {route.variants.length > 1 && (
-                <div className='space-y-2 sm:col-span-2'>
-                  <Label>{t('Specification')}</Label>
-                  <Select
-                    value={String(route.variantIndex)}
-                    onValueChange={(value) => props.onChange(Number(value), {})}
-                  >
-                    <SelectTrigger className='w-full'>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {route.variants.map((variant) => (
-                        <SelectItem
-                          key={variant.index}
-                          value={String(variant.index)}
-                        >
-                          {t(variant.label)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              {route.fields.map((field) => (
-                <PriceControl
-                  key={field.name}
-                  field={field}
-                  id={`${route.id}-${field.name}`}
-                  onChange={(value) =>
-                    props.onChange(route.variantIndex, {
-                      ...Object.fromEntries(
-                        route.fields.map((item) => [item.name, item.value])
-                      ),
-                      [field.name]: value,
-                    })
+          <CopyButton
+            size='sm'
+            aria-label={t('Copy route prices')}
+            value={[
+              route.provider,
+              route.sku,
+              ...(props.referenceOnly
+                ? [
+                    t(
+                      'Reference prices for a 1-second video; request a live quote for your actual video.'
+                    ),
+                  ]
+                : []),
+              ...route.rows.flatMap((row) =>
+                row.tokenRates.length &&
+                (props.type === 'chat' || row.estimate?.nativeUnit === 'tokens')
+                  ? row.tokenRates.map(
+                      (rate) =>
+                        `${t(row.name)} · ${t(RATE_LABELS[rate.label] || rate.label)}: ${amount(rate.amount)} ${t('credits')} / ${t('1M tokens')}`
+                    )
+                  : [
+                      `${t(row.name)}: ${amount(row.estimate?.nativeUnit === 'call' ? row.estimate.amount : row.estimate?.unitPrice)} ${t('credits')} / ${unit(row.estimate?.nativeUnit || '')}`,
+                    ]
+              ),
+            ].join('\n')}
+          />
+        </div>
+        <CollapsibleContent>
+          {props.type !== 'chat' && route.parameters && (
+            <div className='flex min-w-0 items-center gap-2 border-b px-5 py-3'>
+              <code className='min-w-0 flex-1 text-xs break-all'>
+                route_id: {route.id}
+              </code>
+              <CopyButton
+                value={route.id}
+                size='sm'
+                aria-label={t('Copy route ID')}
+              />
+            </div>
+          )}
+          {route.variants.length > 1 && (
+            <div
+              className='flex flex-wrap gap-2 border-b p-4'
+              role='group'
+              aria-label={t('Published specifications')}
+            >
+              {route.variants.map((variant) => (
+                <Button
+                  key={variant.index}
+                  variant={
+                    variant.index === route.variantIndex
+                      ? 'secondary'
+                      : 'outline'
                   }
-                />
+                  size='sm'
+                  className='h-auto flex-col items-start gap-1 py-2 text-left text-xs whitespace-normal'
+                  aria-pressed={variant.index === route.variantIndex}
+                  onClick={() =>
+                    props.onChange(variant.index, variant.price?.values || {})
+                  }
+                >
+                  <span>{t(variant.label)}</span>
+                  {variant.price && (
+                    <span className='font-mono text-[var(--market-amber)]'>
+                      {amount(variant.price.amount)} {t('credits')} /{' '}
+                      {unit(variant.price.unit)}
+                    </span>
+                  )}
+                </Button>
               ))}
             </div>
-          </CollapsibleContent>
-        </Collapsible>
-      )}
+          )}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className='pl-5'>{t('Specification')}</TableHead>
+                <TableHead className='text-right'>
+                  {t(props.referenceOnly ? 'Reference price' : 'Sale price')}
+                </TableHead>
+                <TableHead>{t('Billing unit')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {route.rows.flatMap((row) => {
+                const tokenRows =
+                  row.tokenRates.length &&
+                  (props.type === 'chat' ||
+                    row.estimate?.nativeUnit === 'tokens')
+                if (tokenRows) {
+                  return [
+                    ...row.tokenRates.map((rate) => (
+                      <TableRow key={`${row.key}:${rate.label}`}>
+                        <TableCell className='max-w-64 pl-5 text-xs whitespace-normal'>
+                          {t(row.name)} ·{' '}
+                          {t(RATE_LABELS[rate.label] || rate.label)}
+                          {row.contextThreshold
+                            ? ` (≤ ${row.contextThreshold.toLocaleString()})`
+                            : ''}
+                        </TableCell>
+                        <TableCell className='text-right font-semibold text-amber-500 tabular-nums dark:text-amber-300'>
+                          {amount(rate.amount)}
+                        </TableCell>
+                        <TableCell className='text-muted-foreground text-xs'>
+                          {t('credits')} / {t('1M tokens')}
+                        </TableCell>
+                      </TableRow>
+                    )),
+                    ...row.longContextRates.map((rate) => (
+                      <TableRow key={`${row.key}:long:${rate.label}`}>
+                        <TableCell className='pl-5 text-xs whitespace-normal'>
+                          {t(row.name)} ·{' '}
+                          {t(RATE_LABELS[rate.label] || rate.label)} (&gt;{' '}
+                          {row.contextThreshold?.toLocaleString()})
+                        </TableCell>
+                        <TableCell className='text-right font-semibold text-amber-500 tabular-nums dark:text-amber-300'>
+                          {amount(rate.amount)}
+                        </TableCell>
+                        <TableCell className='text-muted-foreground text-xs'>
+                          {t('credits')} / {t('1M tokens')}
+                        </TableCell>
+                      </TableRow>
+                    )),
+                  ]
+                }
+                let price = row.estimate?.unitPrice
+                if (row.estimate?.nativeUnit === 'call') {
+                  price = row.estimate.amount
+                }
+                if (row.estimate?.nativeUnit === 'characters') {
+                  price = row.characterUnit ?? undefined
+                }
+                return [
+                  <TableRow key={row.key}>
+                    <TableCell className='pl-5 text-xs whitespace-normal'>
+                      {t(row.name)}
+                    </TableCell>
+                    <TableCell className='text-right text-base font-semibold text-amber-500 tabular-nums dark:text-amber-300'>
+                      {amount(price)}
+                    </TableCell>
+                    <TableCell className='text-muted-foreground text-xs'>
+                      {row.estimate
+                        ? `${t('credits')} / ${unit(row.estimate.nativeUnit)}`
+                        : '—'}
+                    </TableCell>
+                  </TableRow>,
+                  !props.referenceOnly &&
+                  row.estimate &&
+                  row.estimate.nativeUnit !== 'call' ? (
+                    <TableRow
+                      key={`${row.key}:estimate`}
+                      className='bg-muted/30'
+                    >
+                      <TableCell className='pl-5 text-xs'>
+                        {t('Estimated total')}
+                      </TableCell>
+                      <TableCell className='text-right font-semibold'>
+                        {amount(row.estimate.amount)}
+                      </TableCell>
+                      <TableCell className='text-muted-foreground text-xs'>
+                        {t('credits')}
+                      </TableCell>
+                    </TableRow>
+                  ) : null,
+                ]
+              })}
+              {!route.rows.length && (
+                <TableRow>
+                  <TableCell colSpan={3}>
+                    {t(
+                      props.referenceOnly
+                        ? 'Quoted per video before each task'
+                        : 'Price temporarily unavailable'
+                    )}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+          {(route.variants.length > 1 || route.fields.length > 0) && (
+            <Collapsible className='border-t'>
+              <CollapsibleTrigger className='text-muted-foreground flex w-full items-center justify-between px-5 py-3 text-xs'>
+                {t('Adjust specification')}
+                <ChevronDown className='size-4' />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className='grid gap-4 px-5 pb-5 sm:grid-cols-2'>
+                  {route.variants.length > 1 && (
+                    <div className='space-y-2 sm:col-span-2'>
+                      <Label>{t('Specification')}</Label>
+                      <Select
+                        value={String(route.variantIndex)}
+                        onValueChange={(value) =>
+                          props.onChange(Number(value), {})
+                        }
+                      >
+                        <SelectTrigger className='w-full'>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {route.variants.map((variant) => (
+                            <SelectItem
+                              key={variant.index}
+                              value={String(variant.index)}
+                            >
+                              {t(variant.label)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {route.fields.map((field) => (
+                    <PriceControl
+                      key={field.name}
+                      field={field}
+                      id={`${route.id}-${field.name}`}
+                      onChange={(value) =>
+                        props.onChange(route.variantIndex, {
+                          ...Object.fromEntries(
+                            route.fields.map((item) => [item.name, item.value])
+                          ),
+                          [field.name]: value,
+                        })
+                      }
+                    />
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
     </section>
   )
 }
@@ -529,7 +541,7 @@ export function ModelPrices(props: { model: string }) {
           )}
         </p>
       )}
-      <div className='grid grid-cols-1 items-start gap-4'>
+      <div className='grid grid-cols-1 items-start gap-4 lg:grid-cols-2'>
         {orderedRoutes.map((route) => (
           <RouteCard
             key={route.id}
@@ -567,7 +579,7 @@ export function ModelPrices(props: { model: string }) {
           {t('No published route prices are available.')}
         </p>
       )}
-      <footer className='bg-background/95 sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t py-4 text-xs backdrop-blur'>
+      <footer className='bg-background/95 flex flex-wrap items-center justify-between gap-3 border-t py-4 text-xs backdrop-blur'>
         <div className='text-muted-foreground flex flex-wrap gap-x-6 gap-y-2'>
           <span>
             {t(

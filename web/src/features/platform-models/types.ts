@@ -42,6 +42,14 @@ export type PriceRow = {
   estimate: { nativeUnit: string; amount: number; unitPrice: number } | null
 }
 export type PriceRoute = {
+  available?: boolean
+  reason?: string
+  speed?: {
+    p50Ms: number
+    metric: string
+    samples: number
+    window: string
+  } | null
   id: string
   provider: string
   sku: string
@@ -99,6 +107,7 @@ export type ModelSummary = {
   billingUnits: BillingUnit[]
   minimumComplete: boolean
   routeCount: number
+  availableRouteCount?: number
   pricedRouteCount: number
   unavailableRouteCount: number
   successRate: number | null

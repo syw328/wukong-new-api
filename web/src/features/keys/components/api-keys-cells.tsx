@@ -163,9 +163,11 @@ export function ModelLimitsCell(props: ApiKeyRestrictionProps) {
       {props.apiKey.routing_policy && (
         <span className='text-muted-foreground text-xs'>
           {t(
-            ROUTING_STRATEGY_LABELS[
-              props.apiKey.routing_policy.default_strategy
-            ]
+            props.apiKey.routing_policy.mode === 'custom'
+              ? 'Custom routes'
+              : ROUTING_STRATEGY_LABELS[
+                  props.apiKey.routing_policy.default_strategy
+                ]
           )}{' '}
           ·{' '}
           {t('{{count}} model strategy rules', {

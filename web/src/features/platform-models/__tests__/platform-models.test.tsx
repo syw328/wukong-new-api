@@ -134,7 +134,8 @@ describe('account model price details', () => {
       refetch: vi.fn(),
     })
     render(<ModelPrices model='test-image' />)
-    expect(screen.getAllByText('0%')).toHaveLength(2)
+    expect(screen.getByText('0%')).toBeTruthy()
+    expect(screen.getByText('0.0%')).toBeTruthy()
     expect(screen.getByText('0.06')).toBeTruthy()
     expect(screen.getByText(/Valid until/)).toBeTruthy()
     expect(screen.getByText(/Your account prices/)).toBeTruthy()

@@ -103,5 +103,5 @@ export const ROUTING_STRATEGY_LABELS = {
   balanced: 'Balanced priority',
   cheapest: 'Price priority',
   fastest: 'Speed priority',
-  most_reliable: 'Stability priority',
+  most_reliable: 'Success rate priority',
 } as const

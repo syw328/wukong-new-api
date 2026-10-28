@@ -1011,6 +1011,25 @@ func TestTokenRoutingPolicyDatabaseMatrix(t *testing.T) {
 				current, err = service.PlatformKeyRoutingHeader(71, token.Id, "gpt-image-2")
 				require.NoError(t, err)
 				assert.Equal(t, projection, current)
+				// Upgrade the same stored v1 key to exact v2 routes without changing its identity.
+				tokenRoutingCatalogFixture(t, db)
+				policy.Version, policy.Mode = 2, "custom"
+				policy.ModelRules[0].AllowedStrategies = []string{"cheapest"}
+				policy.ModelRules[0].RouteIDs = []string{strings.Repeat("a", 24), strings.Repeat("b", 24)}
+				policy.ModelRules[0].RouteOrder = "manual"
+				payload["routing_policy"] = policy
+				ctx, response = newAuthenticatedContext(t, http.MethodPut, "/api/token/", payload, 71)
+				UpdateToken(ctx)
+				require.True(t, decodeAPIResponse(t, response).Success, response.Body.String())
+				var upgraded model.Token
+				require.NoError(t, db.First(&upgraded, token.Id).Error)
+				upgradedPolicy, err := upgraded.GetRoutingPolicy()
+				require.NoError(t, err)
+				assert.Equal(t, &policy, upgradedPolicy)
+				upgradedContext, err := upgraded.PlatformRoutingContext("gpt-image-2")
+				require.NoError(t, err)
+				assert.Equal(t, policy.ModelRules[0].RouteIDs, upgradedContext.RouteIDs)
+				assert.Equal(t, "manual", upgradedContext.RouteOrder)
 				require.NoError(t, db.Model(&model.Token{}).Where("id = ?", token.Id).Update("model_limits", "different-model").Error)
 				_, err = service.PlatformKeyRoutingHeader(71, token.Id, "gpt-image-2")
 				require.Error(t, err, "paid requests must re-read current model permissions")

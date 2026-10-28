@@ -30,7 +30,8 @@ export const routingStrategySchema = z.enum([
 ])
 export type RoutingStrategy = z.infer<typeof routingStrategySchema>
 export const keyRoutingPolicySchema = z.object({
-  version: z.literal(1),
+  version: z.union([z.literal(1), z.literal(2)]),
+  mode: z.enum(['automatic', 'custom']).optional(),
   default_strategy: routingStrategySchema,
   allowed_strategies: z.array(routingStrategySchema).min(1).max(4),
   allow_fixed_routes: z.boolean(),
@@ -38,6 +39,8 @@ export const keyRoutingPolicySchema = z.object({
     .array(
       z.object({
         model: z.string(),
+        route_ids: z.array(z.string()).min(1).max(32).optional(),
+        route_order: z.enum(['strategy', 'manual']).optional(),
         default_strategy: routingStrategySchema,
         allowed_strategies: z.array(routingStrategySchema).min(1).max(4),
       })

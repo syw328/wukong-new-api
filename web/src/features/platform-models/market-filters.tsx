@@ -26,7 +26,13 @@ export function MarketFilters(props: {
   const vendors = [
     ...new Set(props.models.map((model) => model.vendor || 'Other')),
   ]
-  const tags = [...new Set(props.models.flatMap((model) => model.tags))]
+  const tags = [
+    ...new Map(
+      props.models
+        .flatMap((model) => model.tags)
+        .map((tag) => [tag.toLocaleLowerCase(), tag])
+    ).values(),
+  ]
   const count = (key: keyof MarketFiltersValue, value: string): number => {
     const filters = { ...props.value, [key]: value }
     return filterPlatformModels(
@@ -74,7 +80,9 @@ export function MarketFilters(props: {
       title: 'Model tags',
       options: ['all', ...tags].map((value) => ({
         value,
-        label: t(value === 'all' ? 'All tags' : value),
+        label: /^\d+(?:K|M|P)$/i.test(value)
+          ? value
+          : t(value === 'all' ? 'All tags' : value),
         count: count('tag', value),
       })),
     },
@@ -101,8 +109,17 @@ export function MarketFilters(props: {
         <div key={section.key} role='group' aria-label={t(section.title)}>
           <FilterSection
             title={t(section.title)}
+            alwaysOpen={section.key === 'category'}
+            defaultOpen={
+              section.key === 'category' || props.value[section.key] !== 'all'
+            }
             value={props.value[section.key]}
-            options={section.options}
+            options={section.options.filter(
+              (option) =>
+                option.count > 0 ||
+                option.value === 'all' ||
+                option.value === props.value[section.key]
+            )}
             onChange={(value) =>
               props.onChange({ ...props.value, [section.key]: value })
             }

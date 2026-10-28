@@ -51,6 +51,60 @@ let renderedDrawer: RenderedDrawer | null = null
 function installApiFixtures(createdPayloads: Array<Record<string, unknown>>) {
   apiClient.get = async (url) => {
     switch (url) {
+      case '/api/platform-catalog':
+        return {
+          data: {
+            success: true,
+            data: {
+              models: [
+                {
+                  id: 'gpt-image-2',
+                  name: 'Canvas Image',
+                  type: 'image',
+                  vendor: 'OpenAI',
+                  tags: ['4K'],
+                  parameters: [],
+                  description: '',
+                  available: true,
+                },
+                {
+                  id: 'seedance-2.0-fast',
+                  name: 'Seedance Fast',
+                  type: 'video',
+                  vendor: 'ByteDance',
+                  tags: [],
+                  parameters: [],
+                  description: '',
+                  available: true,
+                },
+              ],
+            },
+          },
+        }
+      case '/api/token/routing-options?model=gpt-image-2':
+        return {
+          data: {
+            success: true,
+            data: {
+              model: { name: 'Canvas Image' },
+              routes: ['A', 'B'].map((name, index) => ({
+                id: (index ? 'b' : 'a').repeat(24),
+                provider: `Route ${name}`,
+                sku: 'image',
+                available: true,
+                reason: '',
+                speed: null,
+                startingPrice: { amount: 0.01, unit: 'call' },
+                successRate: null,
+                samples: 0,
+                variantIndex: 0,
+                variants: [],
+                rows: [],
+                fields: [],
+              })),
+            },
+          },
+        }
       case '/api/status':
         return {
           data: {
@@ -286,75 +340,77 @@ describe('API keys mutate drawer Auto group integration', () => {
   })
 })
 
-test('routing permission dialog keeps cancellation local and saves model strategy restrictions together', async () => {
-  const createdPayloads: Array<Record<string, unknown>> = []
-  installApiFixtures(createdPayloads)
+test('custom routing cancellation does not change the key draft', async () => {
+  const payloads: Array<Record<string, unknown>> = []
+  installApiFixtures(payloads)
   await renderCreateDrawer()
-  fireEvent.click(findButton('Configure model and strategy permissions', true))
-  const dialog = screen.getByRole('dialog', {
-    name: 'Model and strategy permissions',
-  })
-  const draftDefault = dialog.querySelector(
-    'select[aria-label="Default routing strategy"]'
+  fireEvent.click(screen.getByRole('button', { name: /Custom routes/ }))
+  fireEvent.click(
+    await screen.findByRole('checkbox', { name: 'Allow model Canvas Image' })
   )
-  if (!draftDefault) throw new Error('Expected routing strategy control')
-  fireEvent.change(draftDefault, { target: { value: 'cheapest' } })
   fireEvent.click(findButton('Cancel', true))
   await waitFor(() =>
     expect(
-      screen.queryByRole('dialog', { name: 'Model and strategy permissions' })
+      screen.queryByRole('dialog', { name: 'Custom model routing' })
     ).toBeNull()
   )
-  expect(screen.getByLabelText('Default routing strategy')).toHaveValue(
-    'balanced'
-  )
+  expect(
+    screen.getByRole('button', { name: /Balanced priority/ })
+  ).toHaveAttribute('aria-pressed', 'true')
+  expect(payloads).toHaveLength(0)
+})
 
-  fireEvent.click(findButton('Configure model and strategy permissions', true))
-  fireEvent.click(
-    screen.getByRole('switch', { name: 'Allow selected models only' })
-  )
-  expect(findButton('Apply permissions', true)).toBeDisabled()
+test('custom route selection requires routes and saves exact manual order only with the key', async () => {
+  const createdPayloads: Array<Record<string, unknown>> = []
+  installApiFixtures(createdPayloads)
+  await renderCreateDrawer()
+  fireEvent.click(screen.getByRole('button', { name: /Custom routes/ }))
   const user = userEvent.setup()
   await user.type(
-    screen.getByPlaceholderText('Select at least one model'),
-    'gpt-image'
+    screen.getByRole('textbox', { name: 'Search models' }),
+    'Canvas'
   )
-  fireEvent.click(await screen.findByRole('option', { name: 'gpt-image-2' }))
-  await user.type(
-    screen.getByPlaceholderText('Choose a model to configure'),
-    'gpt-image'
+  fireEvent.click(
+    await screen.findByRole('checkbox', { name: 'Allow model Canvas Image' })
   )
-  fireEvent.click(await screen.findByRole('option', { name: 'gpt-image-2' }))
-  const permissionGroup = screen.getByRole('group', {
-    name: 'Allowed strategies for gpt-image-2',
-  })
-  for (const checkbox of permissionGroup.querySelectorAll<HTMLInputElement>(
-    '[role="checkbox"]'
-  )) {
-    if (!checkbox.closest('label')?.textContent?.includes('Price priority')) {
-      fireEvent.click(checkbox)
-    }
-  }
-  fireEvent.click(findButton('Apply permissions', true))
+  expect(findButton('Next: routing order', true)).toBeDisabled()
+  fireEvent.click(
+    await screen.findByRole('checkbox', { name: 'Select route Route A image' })
+  )
+  fireEvent.click(
+    screen.getByRole('checkbox', { name: 'Select route Route B image' })
+  )
+  fireEvent.click(findButton('Next: routing order', true))
+  fireEvent.click(
+    screen.getByRole('switch', { name: 'Use manual route order' })
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Move route down 1' }))
+  fireEvent.click(findButton('Apply configuration', true))
   await waitFor(() =>
     expect(
-      screen.queryByRole('dialog', { name: 'Model and strategy permissions' })
+      screen.queryByRole('dialog', { name: 'Custom model routing' })
     ).toBeNull()
   )
+  expect(createdPayloads).toHaveLength(0)
   changeInput(getControlByLabel('Name'), 'restricted-media')
   fireEvent.click(findButton('Save changes', true))
   await waitFor(() => expect(createdPayloads).toHaveLength(1))
-  expect(createdPayloads[0]?.model_limits_enabled).toBe(true)
-  expect(createdPayloads[0]?.model_limits).toBe('gpt-image-2')
-  expect(createdPayloads[0]?.routing_policy).toMatchObject({
-    default_strategy: 'balanced',
-    allow_fixed_routes: false,
-    model_rules: [
-      {
-        model: 'gpt-image-2',
-        default_strategy: 'cheapest',
-        allowed_strategies: ['cheapest'],
-      },
-    ],
+  expect(createdPayloads[0]).toMatchObject({
+    model_limits_enabled: true,
+    model_limits: 'gpt-image-2',
+    routing_policy: {
+      version: 2,
+      mode: 'custom',
+      allow_fixed_routes: false,
+      model_rules: [
+        {
+          model: 'gpt-image-2',
+          default_strategy: 'balanced',
+          allowed_strategies: ['balanced'],
+          route_order: 'manual',
+          route_ids: ['b'.repeat(24), 'a'.repeat(24)],
+        },
+      ],
+    },
   })
 })

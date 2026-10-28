@@ -28,7 +28,9 @@ export function filterPlatformModels(
         (model.vendor || 'Other') === filters.vendor) &&
       (!filters.tag ||
         filters.tag === 'all' ||
-        model.tags.includes(filters.tag)) &&
+        model.tags.some(
+          (tag) => tag.toLocaleLowerCase() === filters.tag?.toLocaleLowerCase()
+        )) &&
       (!filters.billing ||
         filters.billing === 'all' ||
         summaries[model.id]?.billingUnits.includes(
@@ -100,7 +102,8 @@ export function formatPriceBookDate(value: string, language: string): string {
 }
 
 export function formatMarketAmount(value: number): string {
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 }).format(
+  if (value > 0 && value < 0.0001) return '＜0.0001'
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 4 }).format(
     value
   )
 }

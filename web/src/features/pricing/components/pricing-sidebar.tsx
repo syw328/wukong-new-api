@@ -50,6 +50,8 @@ type FilterOption = {
 }
 
 type FilterSectionProps = {
+  defaultOpen?: boolean
+  alwaysOpen?: boolean
   title: string
   value: string
   options: FilterOption[]
@@ -130,10 +132,14 @@ function FilterChip(props: {
 export function FilterSection(props: FilterSectionProps) {
   return (
     <Collapsible
-      defaultOpen
+      defaultOpen={props.defaultOpen ?? true}
+      open={props.alwaysOpen ? true : undefined}
       className='border-border/70 border-b pb-3 last:border-b-0'
     >
-      <CollapsibleTrigger className='group flex w-full items-center justify-between py-2.5 text-left'>
+      <CollapsibleTrigger
+        disabled={props.alwaysOpen}
+        className='group flex w-full items-center justify-between py-2.5 text-left'
+      >
         <span className='text-foreground text-sm font-semibold'>
           {props.title}
         </span>
