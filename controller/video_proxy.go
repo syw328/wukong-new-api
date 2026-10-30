@@ -550,7 +550,7 @@ func copyTaskMediaResponseHeaders(destination, source http.Header) {
 
 func setTaskMediaResponseSecurityHeaders(header http.Header) {
 	header.Set("Cache-Control", "private, no-store")
-	header.Set("Content-Security-Policy", "sandbox; default-src 'none'")
+	header.Set("Content-Security-Policy", "sandbox allow-same-origin; default-src 'none'; media-src 'self'")
 	header.Set("Referrer-Policy", "no-referrer")
 	header.Set("X-Content-Type-Options", "nosniff")
 }

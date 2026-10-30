@@ -32,6 +32,11 @@ type TaskPollingAdaptor interface {
 	AdjustBillingOnComplete(task *model.Task, taskResult *relaycommon.TaskInfo) int
 }
 
+// Context-aware adaptors release HTTP work when the polling lease is lost.
+type contextualTaskPollingAdaptor interface {
+	FetchTaskWithContext(context.Context, string, string, *model.Task, string) (*http.Response, error)
+}
+
 type BatchTaskPollingAdaptor interface {
 	TaskPollingAdaptor
 	FetchMode() string
@@ -438,34 +443,54 @@ func updateVideoTasks(ctx context.Context, platform constant.TaskPlatform, chann
 		}
 		return fmt.Errorf("CacheGetChannel failed: %w", err)
 	}
-	adaptor := GetTaskAdaptorFunc(platform)
-	if adaptor == nil {
-		return fmt.Errorf("video adaptor not found")
+	// Only our own state mirror may poll concurrently. Vendor channels retain
+	// their existing request pacing and independently initialized adaptors.
+	workers := 1
+	if platform == "platform-media" {
+		workers = min(8, len(taskIds))
 	}
-	info := &relaycommon.RelayInfo{}
-	info.ChannelMeta = &relaycommon.ChannelMeta{
-		ChannelBaseUrl: cacheGetChannel.GetBaseURL(),
+	adaptors := make([]TaskPollingAdaptor, workers)
+	for worker := range workers {
+		adaptor := GetTaskAdaptorFunc(platform)
+		if adaptor == nil {
+			return fmt.Errorf("video adaptor not found")
+		}
+		adaptor.Init(&relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelBaseUrl: cacheGetChannel.GetBaseURL(), ApiKey: cacheGetChannel.Key,
+		}})
+		adaptors[worker] = adaptor
 	}
-	info.ApiKey = cacheGetChannel.Key
-	adaptor.Init(info)
-	disablePollingSleep := cacheGetChannel.GetOtherSettings().DisableTaskPollingSleep
-	for i, taskId := range taskIds {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		if err := updateVideoSingleTask(ctx, adaptor, cacheGetChannel, taskId, taskM); err != nil {
-			logger.LogError(ctx, fmt.Sprintf("Failed to update video task %s: %s", taskId, err.Error()))
-		}
-		if disablePollingSleep || i == len(taskIds)-1 {
-			continue
-		}
-
-		// sleep 1 second between tasks for this channel only.
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(1 * time.Second):
-		}
+	jobs := make(chan int, len(taskIds))
+	for i := range taskIds {
+		jobs <- i
+	}
+	close(jobs)
+	var wg sync.WaitGroup
+	for _, adaptor := range adaptors {
+		wg.Add(1)
+		gopool.Go(func() {
+			defer wg.Done()
+			for i := range jobs {
+				if ctx.Err() != nil {
+					return
+				}
+				if err := updateVideoSingleTask(ctx, adaptor, cacheGetChannel, taskIds[i], taskM); err != nil {
+					logger.LogError(ctx, fmt.Sprintf("Failed to update video task %s: %s", taskIds[i], err.Error()))
+				}
+				if workers > 1 || platform == "platform-media" || cacheGetChannel.GetOtherSettings().DisableTaskPollingSleep || i == len(taskIds)-1 {
+					continue
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second):
+				}
+			}
+		})
+	}
+	wg.Wait()
+	if ctx.Err() != nil {
+		return ctx.Err()
 	}
 	return nil
 }
@@ -492,12 +517,33 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 		key = privateData.Key
 	}
 	snap := task.Snapshot()
-	resp, err := adaptor.FetchTask(baseURL, key, task, proxy)
+	pollCtx := ctx
+	if task.Platform == "platform-media" {
+		var cancel context.CancelFunc
+		pollCtx, cancel = context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+	}
+	var resp *http.Response
+	var err error
+	if contextual, ok := adaptor.(contextualTaskPollingAdaptor); ok {
+		resp, err = contextual.FetchTaskWithContext(pollCtx, baseURL, key, task, proxy)
+	} else {
+		resp, err = adaptor.FetchTask(baseURL, key, task, proxy)
+	}
+	if ctx.Err() != nil {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+		return ctx.Err()
+	}
 	if err != nil {
 		return recordPollFailure(ctx, adaptor, task, snap.Status, pollClassTransport, 0, err.Error())
 	}
 	defer resp.Body.Close()
 	responseBody, err := io.ReadAll(resp.Body)
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	if err != nil {
 		return recordPollFailure(ctx, adaptor, task, snap.Status, pollClassTransport, resp.StatusCode, err.Error())
 	}
@@ -506,6 +552,9 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 
 	switch classifyPollHTTP(resp.StatusCode) {
 	case pollClassNotFound:
+		if task.Platform == "platform-media" {
+			return recordPollFailure(ctx, adaptor, task, snap.Status, pollClassNotFound, resp.StatusCode, "")
+		}
 		return failTaskFromPoll(ctx, adaptor, task, snap.Status, fmt.Sprintf("upstream task not found (HTTP %d)", resp.StatusCode))
 	case pollClassAuth:
 		logger.LogWarn(ctx, fmt.Sprintf("task poll auth failure channel_id=%d task=%s http=%d", ch.Id, task.TaskID, resp.StatusCode))
@@ -764,7 +813,8 @@ func unrecognizedPollDetail(reason string, body []byte) string {
 
 func recordPollFailure(ctx context.Context, adaptor TaskPollingAdaptor, task *model.Task, fromStatus model.TaskStatus, class string, statusCode int, detail string) error {
 	task.PrivateData.PollFailures++
-	if class == pollClassUnrecognized || class == pollClassHookError {
+	if class == pollClassUnrecognized || class == pollClassHookError ||
+		(task.Platform == "platform-media" && task.PrivateData.PollFailures%20 == 0) {
 		// The redacted body is intentionally not persisted to Task.Data on these
 		// paths, so the WARN line is the only operator-visible copy of what the
 		// plugin could not interpret.
@@ -772,7 +822,9 @@ func recordPollFailure(ctx context.Context, adaptor TaskPollingAdaptor, task *mo
 	}
 	// TASK_POLL_MAX_FAILURES <= 0 disables the consecutive-failure cutoff, matching
 	// TASK_TIMEOUT_MINUTES semantics; the 24h sweep remains the only backstop.
-	if constant.TaskPollMaxFailures > 0 && task.PrivateData.PollFailures >= constant.TaskPollMaxFailures {
+	// A gateway outage is not a platform generation failure. Only the
+	// authoritative settled result may release this task's quota mirror.
+	if task.Platform != "platform-media" && constant.TaskPollMaxFailures > 0 && task.PrivateData.PollFailures >= constant.TaskPollMaxFailures {
 		return failTaskFromPoll(ctx, adaptor, task, fromStatus, pollFailureReason(class, statusCode, detail))
 	}
 	if _, err := task.UpdateWithStatus(fromStatus); err != nil {

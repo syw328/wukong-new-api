@@ -13,6 +13,7 @@ import (
 	"net/textproto"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -1840,4 +1841,47 @@ func TestAlibabaSubmitDeltaDoesNotMutateControlState(t *testing.T) {
 	encoded, err = common.Marshal(result["state"])
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"choices":[{"count":2,"lastText":false,"finishReason":"stop"}],"hasUsage":true}`, string(encoded))
+}
+
+func TestTaskAdaptorPollingCancellationReleasesHTTP(t *testing.T) {
+	service.InitHttpClient()
+	for _, streaming := range []bool{false, true} {
+		t.Run(map[bool]string{false: "waiting for headers", true: "reading body"}[streaming], func(t *testing.T) {
+			started := make(chan struct{})
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if streaming {
+					w.WriteHeader(http.StatusOK)
+					w.(http.Flusher).Flush()
+				}
+				close(started)
+				<-r.Context().Done()
+			}))
+			t.Cleanup(server.Close)
+			plugin, err := pluginruntime.NewRegistry().Register(mockPlugin, pluginruntime.Options{})
+			require.NoError(t, err)
+			ctx, cancel := context.WithCancel(t.Context())
+			t.Cleanup(cancel)
+			done := make(chan error, 1)
+			go func() {
+				response, fetchErr := New(plugin).FetchTaskWithContext(ctx, server.URL, "fixture", &model.Task{}, "")
+				if fetchErr == nil {
+					_, fetchErr = io.ReadAll(response.Body)
+					response.Body.Close()
+				}
+				done <- fetchErr
+			}()
+			select {
+			case <-started:
+			case <-time.After(time.Second):
+				t.Fatal("poll HTTP request did not start")
+			}
+			cancel()
+			select {
+			case err := <-done:
+				require.ErrorIs(t, err, context.Canceled)
+			case <-time.After(time.Second):
+				t.Fatal("poll HTTP request ignored cancellation")
+			}
+		})
+	}
 }

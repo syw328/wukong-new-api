@@ -397,7 +397,7 @@ func TestProxyTaskMediaForwardsRangeAndFiltersResponseHeaders(t *testing.T) {
 	assert.Equal(t, "bytes 0-3/10", recorder.Header().Get("Content-Range"))
 	assert.Equal(t, "bytes", recorder.Header().Get("Accept-Ranges"))
 	assert.Equal(t, "private, no-store", recorder.Header().Get("Cache-Control"))
-	assert.Equal(t, "sandbox; default-src 'none'", recorder.Header().Get("Content-Security-Policy"))
+	assert.Equal(t, "sandbox allow-same-origin; default-src 'none'; media-src 'self'", recorder.Header().Get("Content-Security-Policy"))
 	assert.Equal(t, "no-referrer", recorder.Header().Get("Referrer-Policy"))
 	assert.Equal(t, "nosniff", recorder.Header().Get("X-Content-Type-Options"))
 	assert.Empty(t, recorder.Header().Get("Set-Cookie"))

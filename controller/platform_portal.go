@@ -102,6 +102,11 @@ func proxyPlatformPortal(c *gin.Context, path string, accountPrice bool, mediaQu
 		c.JSON(503, gin.H{"success": false, "message": "Invalid platform response"})
 		return
 	}
+	for _, name := range []string{"Retry-After", "RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset"} {
+		if value := response.Header.Get(name); value != "" {
+			c.Header(name, value)
+		}
+	}
 	c.Header("Cache-Control", "private, no-store")
 	c.Header("Vary", "Cookie, Authorization, Host")
 	c.Data(response.StatusCode, "application/json; charset=utf-8", data)

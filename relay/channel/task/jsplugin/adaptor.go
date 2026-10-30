@@ -597,22 +597,26 @@ func (a *TaskAdaptor) FetchBatchTasks(baseURL, key string, tasks []*model.Task, 
 	if err != nil {
 		return nil, err
 	}
-	return a.doFetchDescriptor(baseURL, proxy, value)
+	return a.doFetchDescriptor(context.Background(), baseURL, proxy, value)
 }
 
 func (a *TaskAdaptor) FetchTask(baseURL, key string, task *model.Task, proxy string) (*http.Response, error) {
+	return a.FetchTaskWithContext(context.Background(), baseURL, key, task, proxy)
+}
+
+func (a *TaskAdaptor) FetchTaskWithContext(requestCtx context.Context, baseURL, key string, task *model.Task, proxy string) (*http.Response, error) {
 	ctx, err := a.queryContext(task, key, baseURL, proxy)
 	if err != nil {
 		return nil, err
 	}
-	value, err := a.plugin.Engine.Call(context.Background(), "buildQueryRequest", ctx)
+	value, err := a.plugin.Engine.Call(requestCtx, "buildQueryRequest", ctx)
 	if err != nil {
 		return nil, err
 	}
-	return a.doFetchDescriptor(baseURL, proxy, value, task)
+	return a.doFetchDescriptor(requestCtx, baseURL, proxy, value, task)
 }
 
-func (a *TaskAdaptor) doFetchDescriptor(baseURL, proxy string, value any, identityTasks ...*model.Task) (*http.Response, error) {
+func (a *TaskAdaptor) doFetchDescriptor(requestCtx context.Context, baseURL, proxy string, value any, identityTasks ...*model.Task) (*http.Response, error) {
 	var descriptor requestDescriptor
 	if err := convert(value, &descriptor); err != nil {
 		return nil, err
@@ -647,7 +651,7 @@ func (a *TaskAdaptor) doFetchDescriptor(baseURL, proxy string, value any, identi
 	if method == "" {
 		method = http.MethodGet
 	}
-	req, err := http.NewRequest(method, descriptor.URL, requestBody)
+	req, err := http.NewRequestWithContext(requestCtx, method, descriptor.URL, requestBody)
 	if err != nil {
 		return nil, err
 	}

@@ -3,8 +3,10 @@ package service
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -18,11 +20,16 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/bytedance/gopkg/util/gopool"
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 type taskPollingFetchAdaptor struct {
+	status       model.TaskStatus
 	mu           sync.Mutex
 	taskIDs      []string
 	fetched      chan string
@@ -85,11 +92,15 @@ func (a *taskPollingFetchAdaptor) FetchTask(_ string, _ string, task *model.Task
 		}
 	}
 
+	status := a.status
+	if status == "" {
+		status = model.TaskStatusInProgress
+	}
 	response := taskdto.TaskResponse[model.Task]{
 		Code: taskdto.TaskSuccessCode,
 		Data: model.Task{
 			TaskID:   taskID,
-			Status:   model.TaskStatusInProgress,
+			Status:   status,
 			Progress: "30%",
 		},
 	}
@@ -500,6 +511,7 @@ func TestUpdateVideoTasksSlowChannelDoesNotBlockOtherChannels(t *testing.T) {
 	slowTask := seedPollingTask(t, slowChannelID, "task_public_slow", "upstream_slow_1")
 	fastFirst := seedPollingTask(t, fastChannelID, "task_public_fast_1", "upstream_fast_parallel_1")
 	fastSecond := seedPollingTask(t, fastChannelID, "task_public_fast_2", "upstream_fast_parallel_2")
+	fastFirstID, fastSecondID := fastFirst.GetUpstreamTaskID(), fastSecond.GetUpstreamTaskID()
 
 	adaptor := &taskPollingFetchAdaptor{
 		fetched:      make(chan string, 4),
@@ -544,8 +556,8 @@ func TestUpdateVideoTasksSlowChannelDoesNotBlockOtherChannels(t *testing.T) {
 	require.Eventually(t, func() bool {
 		fetchedTaskIDs := adaptor.fetchedTaskIDs()
 		return len(fetchedTaskIDs) == 2 &&
-			fetchedTaskIDs[0] == fastFirst.GetUpstreamTaskID() &&
-			fetchedTaskIDs[1] == fastSecond.GetUpstreamTaskID()
+			fetchedTaskIDs[0] == fastFirstID &&
+			fetchedTaskIDs[1] == fastSecondID
 	}, 500*time.Millisecond, 10*time.Millisecond)
 
 	releaseBlockedTask()
@@ -994,6 +1006,122 @@ func TestUpdateBatchTasksPollClassification(t *testing.T) {
 			} else {
 				assert.Equal(t, initialQuota, getUserQuota(t, userID))
 			}
+		})
+	}
+}
+
+func TestPlatformMediaPollingSlowTaskDoesNotBlockTheSameChannel(t *testing.T) {
+	truncate(t)
+	const channelID = 451
+	seedTaskPollingChannel(t, channelID, false)
+	slow := seedPollingTask(t, channelID, "task_slow_platform", "slow_platform")
+	ids := []string{slow.GetUpstreamTaskID()}
+	tasks := map[string]*model.Task{slow.GetUpstreamTaskID(): slow}
+	for i := range 8 {
+		id := fmt.Sprintf("ready_platform_%d", i)
+		fast := seedPollingTask(t, channelID, "task_"+id, id)
+		ids, tasks[id] = append(ids, id), fast
+	}
+	adaptor := &taskPollingFetchAdaptor{status: model.TaskStatusSuccess, blockTaskID: slow.GetUpstreamTaskID(),
+		blockStarted: make(chan struct{}), releaseBlock: make(chan struct{})}
+	var release sync.Once
+	unblock := func() { release.Do(func() { close(adaptor.releaseBlock) }) }
+	t.Cleanup(unblock)
+	previousFactory := GetTaskAdaptorFunc
+	GetTaskAdaptorFunc = func(constant.TaskPlatform) TaskPollingAdaptor { return adaptor }
+	t.Cleanup(func() { GetTaskAdaptorFunc = previousFactory })
+	done := make(chan error, 1)
+	go func() {
+		done <- UpdateVideoTasks(t.Context(), "platform-media", map[int][]string{
+			channelID: ids,
+		}, tasks)
+	}()
+	select {
+	case <-adaptor.blockStarted:
+	case <-time.After(time.Second):
+		t.Fatal("slow platform poll did not start")
+	}
+	assert.Eventually(t, func() bool {
+		var completed int64
+		return model.DB.Model(&model.Task{}).Where("channel_id = ? AND status = ?", channelID, model.TaskStatusSuccess).Count(&completed).Error == nil && completed == 8
+	}, time.Second, 5*time.Millisecond, "ready videos must finish while the first task is still blocked")
+	unblock()
+	require.NoError(t, <-done)
+	assert.Equal(t, 9, adaptor.fetchCount())
+}
+
+func TestPlatformMediaPollingOutageDoesNotInventFailureOrRefund(t *testing.T) {
+	truncate(t)
+	const userID, channelID, quota = 461, 461, 2500
+	seedUser(t, userID, 10000)
+	seedTaskPollingChannel(t, channelID, true)
+	task := seedPollingTask(t, channelID, "task_platform_outage", "act_platform_outage")
+	task.Platform, task.Quota = "platform-media", quota
+	task.UserId, task.SubmitTime = userID, time.Now().Add(-48*time.Hour).Unix()
+	task.PrivateData.PollFailures = constant.TaskPollMaxFailures
+	require.NoError(t, model.DB.Save(task).Error)
+	channel, err := model.GetChannelById(channelID, true)
+	require.NoError(t, err)
+	for _, code := range []int{http.StatusServiceUnavailable, http.StatusNotFound} {
+		require.NoError(t, updateVideoSingleTask(t.Context(), &scriptedPollingAdaptor{statusCode: code}, channel,
+			task.GetUpstreamTaskID(), map[string]*model.Task{task.GetUpstreamTaskID(): task}))
+	}
+	sweepTimedOutTasks(t.Context())
+	var stored model.Task
+	require.NoError(t, model.DB.First(&stored, task.ID).Error)
+	assert.Equal(t, model.TaskStatus(model.TaskStatusInProgress), stored.Status)
+	assert.Equal(t, quota, stored.Quota)
+	assert.Equal(t, 10000, getUserQuota(t, userID))
+	assert.Zero(t, countLogs(t))
+}
+
+func TestPlatformMediaPollingDatabaseMatrix(t *testing.T) {
+	for _, dialect := range []struct {
+		name common.DatabaseType
+		env  string
+	}{
+		{common.DatabaseTypeSQLite, ""},
+		{common.DatabaseTypeMySQL, "TEST_FIXED_MYSQL_DSN"},
+		{common.DatabaseTypePostgreSQL, "TEST_FIXED_POSTGRES_DSN"},
+	} {
+		t.Run(string(dialect.name), func(t *testing.T) {
+			var driver gorm.Dialector = sqlite.Open(":memory:")
+			if dialect.env != "" {
+				dsn := os.Getenv(dialect.env)
+				if dsn == "" {
+					t.Skip(dialect.env + " is not configured")
+				}
+				if dialect.name == common.DatabaseTypeMySQL {
+					driver = mysql.Open(dsn)
+				} else {
+					driver = postgres.New(postgres.Config{DSN: dsn, PreferSimpleProtocol: true})
+				}
+			}
+			db, err := gorm.Open(driver, &gorm.Config{})
+			require.NoError(t, err)
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			sqlDB.SetMaxOpenConns(1)
+			oldDB, oldLogDB := model.DB, model.LOG_DB
+			oldMain, oldLog := common.MainDatabaseType(), common.LogDatabaseType()
+			model.DB, model.LOG_DB = db, db
+			common.SetDatabaseTypes(dialect.name, dialect.name)
+			t.Cleanup(func() {
+				model.DB, model.LOG_DB = oldDB, oldLogDB
+				common.SetDatabaseTypes(oldMain, oldLog)
+				require.NoError(t, sqlDB.Close())
+			})
+			require.NoError(t, db.AutoMigrate(&model.Task{}, &model.User{}, &model.Token{}, &model.Log{}, &model.Channel{}))
+			query := "SELECT version()"
+			if dialect.name == common.DatabaseTypeSQLite {
+				query = "SELECT sqlite_version()"
+			}
+			var version string
+			require.NoError(t, db.Raw(query).Scan(&version).Error)
+			t.Logf("database: %s", version)
+			t.Run("slow task isolation", TestPlatformMediaPollingSlowTaskDoesNotBlockTheSameChannel)
+			t.Run("outage preserves authoritative billing", TestPlatformMediaPollingOutageDoesNotInventFailureOrRefund)
+			t.Run("concurrent stale results refund once", TestUpdateSunoTasksStalePollsRefundExactlyOnce)
 		})
 	}
 }

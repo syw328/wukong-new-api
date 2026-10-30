@@ -104,3 +104,29 @@ func TestPlatformFullCatalogAndAnonymousPrices(t *testing.T) {
 		assert.Equal(t, "private, no-store", w.Header().Get("Cache-Control"))
 	}
 }
+
+func TestPlatformPortalPreservesRetryWindowWithoutForwardingCredentials(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "12")
+		w.Header().Set("RateLimit-Limit", "60")
+		w.Header().Set("RateLimit-Remaining", "0")
+		w.Header().Set("Set-Cookie", "private=must-not-forward")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"type":"rate_limit_error"}}`))
+	}))
+	t.Cleanup(upstream.Close)
+	common.OptionMapRWMutex.Lock()
+	previous := common.OptionMap
+	common.OptionMap = map[string]string{"PlatformPublicBaseURL": upstream.URL}
+	common.OptionMapRWMutex.Unlock()
+	t.Cleanup(func() { common.OptionMapRWMutex.Lock(); common.OptionMap = previous; common.OptionMapRWMutex.Unlock() })
+	router := gin.New()
+	router.GET("/catalog", GetPlatformCatalog)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/catalog", nil))
+	assert.Equal(t, http.StatusTooManyRequests, response.Code)
+	assert.Equal(t, "12", response.Header().Get("Retry-After"))
+	assert.Equal(t, "60", response.Header().Get("RateLimit-Limit"))
+	assert.Equal(t, "0", response.Header().Get("RateLimit-Remaining"))
+	assert.Empty(t, response.Header().Get("Set-Cookie"))
+}
