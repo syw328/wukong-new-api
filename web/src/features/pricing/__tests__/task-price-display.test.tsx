@@ -100,6 +100,18 @@ const model: PricingModel = {
 }
 const clients: QueryClient[] = []
 
+function mockModelDetailsApi() {
+  vi.spyOn(api, 'get').mockImplementation(async (url) => {
+    if (url === '/api/platform-model-insights') {
+      return { data: { success: true, data: null } }
+    }
+    if (url === '/api/perf-metrics') {
+      return { data: { success: true, data: { groups: [] } } }
+    }
+    throw new Error(`Unexpected model details request: ${url}`)
+  })
+}
+
 it('falls back for omitted count labels and preserves canonical units for other quantities', () => {
   expect(taskUsageUnitLabel({ unit: 'count' }, 'zhCN', '次')).toBe('次')
   expect(
@@ -128,7 +140,7 @@ const imageModel: PricingModel = {
 it.each([false, true])(
   'shows localized image labels and units in base and group pricing when configured=%s',
   async (configured) => {
-    vi.spyOn(api, 'get').mockResolvedValue({ data: { data: { groups: [] } } })
+    mockModelDetailsApi()
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
@@ -244,7 +256,7 @@ it('refreshes memoized provider prices when the group or display currency change
 })
 
 it('shows one standard task price and a localized group price without duplicate tiers', async () => {
-  vi.spyOn(api, 'get').mockResolvedValue({ data: { data: { groups: [] } } })
+  mockModelDetailsApi()
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
@@ -445,7 +457,7 @@ it('uses the same recharge conversion and token unit in task condition prices', 
 })
 
 it('switches provider group prices, localized conditions and examples, and shows unconfigured providers', async () => {
-  vi.spyOn(api, 'get').mockResolvedValue({ data: { data: { groups: [] } } })
+  mockModelDetailsApi()
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })

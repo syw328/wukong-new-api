@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -427,37 +428,49 @@ func TestProxyTaskMediaPassesThroughUnsatisfiedRange(t *testing.T) {
 	assert.Equal(t, "private, no-store", recorder.Header().Get("Cache-Control"))
 }
 
-func TestTaskMediaResponseHeaderTimeoutDoesNotTruncateBody(t *testing.T) {
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "video/mp4")
-		w.WriteHeader(http.StatusOK)
-		w.(http.Flusher).Flush()
-		time.Sleep(75 * time.Millisecond)
-		_, _ = w.Write([]byte("complete-body"))
-	}))
-	defer upstream.Close()
+type taskMediaTestTransport func(*http.Request) (*http.Response, error)
 
-	request, err := http.NewRequest(http.MethodGet, upstream.URL, nil)
-	require.NoError(t, err)
-	response, err := doTaskMediaRequest(upstream.Client(), request, 20*time.Millisecond)
-	require.NoError(t, err)
-	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
-	require.NoError(t, err)
-	assert.Equal(t, "complete-body", string(body))
+func (transport taskMediaTestTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	return transport(request)
+}
+
+func TestTaskMediaResponseHeaderTimeoutDoesNotTruncateBody(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		client := &http.Client{Transport: taskMediaTestTransport(func(request *http.Request) (*http.Response, error) {
+			reader, writer := io.Pipe()
+			go func() {
+				select {
+				case <-request.Context().Done():
+					_ = writer.CloseWithError(request.Context().Err())
+				case <-time.After(75 * time.Millisecond):
+					_, _ = writer.Write([]byte("complete-body"))
+					_ = writer.Close()
+				}
+			}()
+			return &http.Response{StatusCode: http.StatusOK, Body: reader}, nil
+		})}
+		request, err := http.NewRequest(http.MethodGet, "https://media.example/body", nil)
+		require.NoError(t, err)
+		response, err := doTaskMediaRequest(client, request, 20*time.Millisecond)
+		require.NoError(t, err)
+		defer response.Body.Close()
+		body, err := io.ReadAll(response.Body)
+		require.NoError(t, err)
+		assert.Equal(t, "complete-body", string(body))
+	})
 }
 
 func TestTaskMediaResponseHeaderTimeoutCancelsBeforeHeaders(t *testing.T) {
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		time.Sleep(75 * time.Millisecond)
-		_, _ = w.Write([]byte("late"))
-	}))
-	defer upstream.Close()
-
-	request, err := http.NewRequest(http.MethodGet, upstream.URL, nil)
-	require.NoError(t, err)
-	_, err = doTaskMediaRequest(upstream.Client(), request, 10*time.Millisecond)
-	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	synctest.Test(t, func(t *testing.T) {
+		client := &http.Client{Transport: taskMediaTestTransport(func(request *http.Request) (*http.Response, error) {
+			<-request.Context().Done()
+			return nil, request.Context().Err()
+		})}
+		request, err := http.NewRequest(http.MethodGet, "https://media.example/headers", nil)
+		require.NoError(t, err)
+		_, err = doTaskMediaRequest(client, request, 10*time.Millisecond)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+	})
 }
 
 func TestWriteVideoDataURLStreamsAndSupportsHead(t *testing.T) {
