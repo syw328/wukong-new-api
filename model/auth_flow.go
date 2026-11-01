@@ -140,6 +140,15 @@ func authFlowTokenHash(token string) string {
 	return common.GenerateHMACWithKey([]byte("auth-flow-v1:"+common.SessionSecret), token)
 }
 
+func authFlowTimeComparison(column, operator string) string {
+	if common.UsingMainDatabase(common.DatabaseTypeSQLite) {
+		// The SQLite driver preserves numeric UTC offsets in ISO timestamps.
+		// Text order differs from instant order across DST or mixed offsets.
+		return fmt.Sprintf("julianday(%s) %s julianday(?)", column, operator)
+	}
+	return column + " " + operator + " ?"
+}
+
 func CreateAuthFlow(input AuthFlowCreate) (string, *AuthFlow, error) {
 	return createAuthFlowWithTx(DB, input)
 }
@@ -223,7 +232,7 @@ func GetAuthFlow(token string, match AuthFlowMatch) (*AuthFlow, error) {
 	if flow.ConsumedAt != nil {
 		return nil, ErrAuthFlowConsumed
 	}
-	if !flow.ExpiresAt.After(time.Now()) {
+	if !flow.ExpiresAt.After(DB.NowFunc()) {
 		return nil, ErrAuthFlowExpired
 	}
 	return &flow, nil
@@ -245,9 +254,9 @@ func ConsumeAuthFlowWithAction(token string, match AuthFlowMatch, action func(tx
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		// Claim with the first write, rather than upgrading a prior read lock.
 		// SQLite cannot reliably upgrade two concurrent deferred read transactions.
-		now := time.Now()
+		now := tx.NowFunc()
 		result := applyAuthFlowMatch(tx.Model(&AuthFlow{}), token, match).
-			Where("consumed_at IS NULL AND expires_at > ?", now).
+			Where("consumed_at IS NULL AND "+authFlowTimeComparison("expires_at", ">"), now).
 			Update("consumed_at", now)
 		if result.Error != nil {
 			return result.Error
@@ -262,7 +271,7 @@ func ConsumeAuthFlowWithAction(token string, match AuthFlowMatch, action func(tx
 		if result.RowsAffected != 1 && consumed.ConsumedAt != nil {
 			return ErrAuthFlowConsumed
 		}
-		if !consumed.ExpiresAt.After(time.Now()) {
+		if !consumed.ExpiresAt.After(tx.NowFunc()) {
 			return ErrAuthFlowExpired
 		}
 		if result.RowsAffected != 1 {
@@ -283,6 +292,6 @@ func ConsumeAuthFlowWithAction(token string, match AuthFlowMatch, action func(tx
 
 func DeleteExpiredAuthFlows(now time.Time) error {
 	cutoff := now.Add(-AuthFlowDefaultCleanupRetention)
-	return DB.Where("expires_at < ? OR (consumed_at IS NOT NULL AND consumed_at < ?)", cutoff, cutoff).
+	return DB.Where(authFlowTimeComparison("expires_at", "<")+" OR "+authFlowTimeComparison("consumed_at", "<"), cutoff, cutoff).
 		Delete(&AuthFlow{}).Error
 }
