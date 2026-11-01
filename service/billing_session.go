@@ -251,6 +251,8 @@ func (s *BillingSession) preConsume(c *gin.Context, quota int) *types.NewAPIErro
 
 func (s *BillingSession) reserveFunding(delta int, requireAvailableQuota bool) error {
 	switch funding := s.funding.(type) {
+	case *PlatformMirrorFunding:
+		return nil
 	case *WalletFunding:
 		if requireAvailableQuota {
 			// Image quantity is known before submission, including retries and
@@ -393,7 +395,12 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
 				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}
-		if userQuota-preConsumedQuota < 0 {
+		platformMirror := false
+		if PlatformBillingMirrorEnabled() && c.GetString("platform") == "platform-media" {
+			_, identityErr := PlatformRelayIdentityHeaders(relayInfo.UserId)
+			platformMirror = identityErr == nil
+		}
+		if !platformMirror && userQuota-preConsumedQuota < 0 {
 			return nil, types.NewErrorWithStatusCode(
 				fmt.Errorf("预扣费额度失败, 用户剩余额度: %s, 需要预扣费额度: %s", logger.FormatQuota(userQuota), logger.FormatQuota(preConsumedQuota)),
 				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
@@ -404,6 +411,9 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 		session := &BillingSession{
 			relayInfo: relayInfo,
 			funding:   &WalletFunding{userId: relayInfo.UserId},
+		}
+		if platformMirror {
+			session.funding = &PlatformMirrorFunding{}
 		}
 		if apiErr := session.preConsume(c, preConsumedQuota); apiErr != nil {
 			return nil, apiErr

@@ -100,6 +100,8 @@ func sweepTimedOutTasks(ctx context.Context) {
 			task.Quota = 0
 		} else {
 			task.FailReason = reason
+			task.BillingPending = true
+			task.PrivateData.PendingBillingResult = relaycommon.FailTaskInfo(reason)
 		}
 
 		won, err := task.UpdateWithStatus(oldStatus)
@@ -112,7 +114,7 @@ func sweepTimedOutTasks(ctx context.Context) {
 			continue
 		}
 		timedOutCount++
-		if !isLegacy && task.Quota != 0 {
+		if !isLegacy {
 			RefundTaskQuota(ctx, task, reason)
 		}
 	}
@@ -150,6 +152,10 @@ func RunTaskPollingOnce(ctx context.Context, report func(processed, total int)) 
 	summary.UnfinishedTasks = len(allTasks)
 	platformTask := make(map[constant.TaskPlatform][]*model.Task)
 	for _, t := range allTasks {
+		if t.BillingPending && (t.Status == model.TaskStatusSuccess || t.Status == model.TaskStatusFailure) {
+			recoverTaskBilling(ctx, t)
+			continue
+		}
 		platformTask[t.Platform] = append(platformTask[t.Platform], t)
 	}
 
@@ -366,6 +372,10 @@ func updateBatchTasks(ctx context.Context, adaptor BatchTaskPollingAdaptor, chan
 
 		isDone := task.Status == model.TaskStatusSuccess || task.Status == model.TaskStatusFailure
 		terminalTransition := isDone && snap.Status != task.Status
+		if terminalTransition {
+			task.BillingPending = true
+			task.PrivateData.PendingBillingResult = &responseItem.TaskInfo
+		}
 		won, updateErr := task.UpdateWithStatus(snap.Status)
 		if updateErr != nil {
 			common.SysLog("UpdateSunoTask task error: " + updateErr.Error())
@@ -377,7 +387,7 @@ func updateBatchTasks(ctx context.Context, adaptor BatchTaskPollingAdaptor, chan
 		}
 		if terminalTransition {
 			billingSettled := settleTaskBillingOnComplete(ctx, adaptor, task, &responseItem.TaskInfo)
-			if task.Status == model.TaskStatusFailure && !billingSettled && task.Quota != 0 {
+			if task.Status == model.TaskStatusFailure && !billingSettled {
 				RefundTaskQuota(ctx, task, task.FailReason)
 			}
 		}
@@ -645,6 +655,8 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 
 	isDone := task.Status == model.TaskStatusSuccess || task.Status == model.TaskStatusFailure
 	if isDone && snap.Status != task.Status {
+		task.BillingPending = true
+		task.PrivateData.PendingBillingResult = taskResult
 		won, err := task.UpdateWithStatus(snap.Status)
 		if err != nil {
 			logger.LogError(ctx, fmt.Sprintf("UpdateWithStatus failed for task %s: %s", task.TaskID, err.Error()))
@@ -664,7 +676,7 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 
 	if shouldFinalizeBilling {
 		billingSettled := settleTaskBillingOnComplete(ctx, adaptor, task, taskResult)
-		if task.Status == model.TaskStatusFailure && !billingSettled && task.Quota != 0 {
+		if task.Status == model.TaskStatusFailure && !billingSettled {
 			RefundTaskQuota(ctx, task, task.FailReason)
 		}
 	}
@@ -732,7 +744,9 @@ func settleTaskBillingOnComplete(ctx context.Context, adaptor TaskPollingAdaptor
 	}
 	// 按次计费的成功任务保持预扣；失败任务由调用方全额退款。
 	if bc := task.PrivateData.BillingContext; bc != nil && bc.PerCallBilling {
-		logger.LogInfo(ctx, fmt.Sprintf("任务 %s 按次计费，跳过差额结算", task.TaskID))
+		if task.Status != model.TaskStatusFailure && task.BillingPending {
+			RecalculateTaskQuota(ctx, task, task.Quota, "按次计费")
+		}
 		return false
 	}
 	// 优先让 adaptor 决定最终额度。
@@ -745,10 +759,36 @@ func settleTaskBillingOnComplete(ctx context.Context, adaptor TaskPollingAdaptor
 	if tokens == 0 && taskResult.CompletionTokens > 0 {
 		tokens = taskResult.CompletionTokens
 	}
-	if tokens > 0 {
-		return RecalculateTaskQuotaByTokens(ctx, task, tokens)
+	if tokens > 0 && RecalculateTaskQuotaByTokens(ctx, task, tokens) {
+		return true
+	}
+	if task.Status != model.TaskStatusFailure && task.BillingPending {
+		RecalculateTaskQuota(ctx, task, task.Quota, "保持原计费")
 	}
 	return false
+}
+
+// Only new terminal transitions carry this marker. Historical failures are
+// never inferred to need a refund from a non-zero quota alone.
+func recoverTaskBilling(ctx context.Context, task *model.Task) {
+	if task.PrivateData.PendingBillingLog != nil {
+		if err := model.FlushTaskBillingLog(task); err != nil {
+			logger.LogWarn(ctx, fmt.Sprintf("任务日志待恢复 %s: %s", task.TaskID, err.Error()))
+		}
+		return
+	}
+	result := task.PrivateData.PendingBillingResult
+	if result == nil {
+		return
+	}
+	adaptor := GetTaskAdaptorFunc(task.Platform)
+	if adaptor == nil {
+		return
+	}
+	settled := settleTaskBillingOnComplete(ctx, adaptor, task, result)
+	if task.Status == model.TaskStatusFailure && !settled {
+		RefundTaskQuota(ctx, task, task.FailReason)
+	}
 }
 
 func classifyPollHTTP(statusCode int) string {
@@ -854,6 +894,8 @@ func failTaskFromPoll(ctx context.Context, adaptor TaskPollingAdaptor, task *mod
 		task.FinishTime = now
 	}
 	task.FailReason = reason
+	task.BillingPending = true
+	task.PrivateData.PendingBillingResult = relaycommon.FailTaskInfo(reason)
 	won, err := task.UpdateWithStatus(fromStatus)
 	if err != nil {
 		return err
@@ -863,7 +905,7 @@ func failTaskFromPoll(ctx context.Context, adaptor TaskPollingAdaptor, task *mod
 	}
 	taskResult := relaycommon.FailTaskInfo(reason)
 	billingSettled := settleTaskBillingOnComplete(ctx, adaptor, task, taskResult)
-	if !billingSettled && task.Quota != 0 {
+	if !billingSettled {
 		RefundTaskQuota(ctx, task, reason)
 	}
 	return nil

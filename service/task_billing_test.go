@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -898,6 +899,8 @@ func TestRefundTaskQuota_ZeroQuota(t *testing.T) {
 
 	task := makeTask(userID, 0, 0, 0, BillingSourceWallet, 0)
 
+	require.NoError(t, model.DB.Create(task).Error)
+
 	assert.True(t, RefundTaskQuota(ctx, task, "zero quota task"))
 
 	// No change to user quota
@@ -980,6 +983,8 @@ func TestRecalculate_PositiveDelta(t *testing.T) {
 
 	task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceWallet, 0)
 
+	require.NoError(t, model.DB.Create(task).Error)
+
 	RecalculateTaskQuota(ctx, task, actualQuota, "adaptor adjustment")
 
 	// User quota should decrease by the delta (1000 additional charge)
@@ -1019,6 +1024,8 @@ func TestRecalculate_NegativeDelta(t *testing.T) {
 
 	task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceWallet, 0)
 
+	require.NoError(t, model.DB.Create(task).Error)
+
 	RecalculateTaskQuota(ctx, task, actualQuota, "adaptor adjustment")
 
 	// User quota should increase by abs(delta) = 2000 (refund overpayment)
@@ -1052,6 +1059,8 @@ func TestRecalculate_ZeroDelta(t *testing.T) {
 	seedUser(t, userID, initQuota)
 
 	task := makeTask(userID, 0, preConsumed, 0, BillingSourceWallet, 0)
+
+	require.NoError(t, model.DB.Create(task).Error)
 
 	RecalculateTaskQuota(ctx, task, preConsumed, "exact match")
 
@@ -1093,6 +1102,8 @@ func TestRecalculate_RejectsNegativeActualQuota(t *testing.T) {
 	seedUser(t, userID, initQuota)
 	task := makeTask(userID, 0, preConsumed, 0, BillingSourceWallet, 0)
 
+	require.NoError(t, model.DB.Create(task).Error)
+
 	RecalculateTaskQuota(ctx, task, -1, "invalid negative actual")
 
 	assert.Equal(t, initQuota, getUserQuota(t, userID))
@@ -1117,6 +1128,8 @@ func TestRecalculate_Subscription_NegativeDelta(t *testing.T) {
 	seedChargedAccounting(t, userID, channelID, tokenID, preConsumed, 1)
 
 	task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceSubscription, subID)
+
+	require.NoError(t, model.DB.Create(task).Error)
 
 	RecalculateTaskQuota(ctx, task, actualQuota, "subscription over-charge")
 
@@ -1375,6 +1388,8 @@ func TestSettle_PerCallBilling_SkipsAdaptorAdjust(t *testing.T) {
 	adaptor := &mockAdaptor{adjustReturn: 2000}
 	taskResult := &relaycommon.TaskInfo{Status: model.TaskStatusSuccess}
 
+	require.NoError(t, model.DB.Create(task).Error)
+
 	settled := settleTaskBillingOnComplete(ctx, adaptor, task, taskResult)
 
 	// Per-call: no adjustment despite adaptor returning 2000
@@ -1402,6 +1417,8 @@ func TestSettle_PerCallBilling_SkipsTotalTokens(t *testing.T) {
 
 	adaptor := &mockAdaptor{adjustReturn: 0}
 	taskResult := &relaycommon.TaskInfo{Status: model.TaskStatusSuccess, TotalTokens: 9999}
+
+	require.NoError(t, model.DB.Create(task).Error)
 
 	settled := settleTaskBillingOnComplete(ctx, adaptor, task, taskResult)
 
@@ -1431,6 +1448,8 @@ func TestSettle_NonPerCallBilling_AppliesAdaptorAdjustment(t *testing.T) {
 
 	adaptor := &mockAdaptor{adjustReturn: adaptorQuota}
 	taskResult := &relaycommon.TaskInfo{Status: model.TaskStatusSuccess}
+
+	require.NoError(t, model.DB.Create(task).Error)
 
 	settled := settleTaskBillingOnComplete(ctx, adaptor, task, taskResult)
 
@@ -1463,6 +1482,8 @@ func TestSettle_TieredEvaluationFailureKeepsPreConsumedCharge(t *testing.T) {
 		TaskUsageBilling: true,
 	}
 
+	require.NoError(t, model.DB.Create(task).Error)
+
 	settled := settleTaskBillingOnComplete(ctx, &mockAdaptor{}, task, &relaycommon.TaskInfo{Status: model.TaskStatusFailure})
 
 	assert.True(t, settled)
@@ -1492,6 +1513,8 @@ func TestSettle_TieredFailureReturnsFalseForCallerRefund(t *testing.T) {
 		UsageFacts:       map[string]any{"seconds": float64(5), "clips": float64(2)},
 		EstimatedTier:    "base",
 	}
+
+	require.NoError(t, model.DB.Create(task).Error)
 
 	settled := settleTaskBillingOnComplete(
 		ctx,
@@ -1529,6 +1552,8 @@ func TestSettle_TieredSuccessStillRecomputes(t *testing.T) {
 		UsageFacts:       map[string]any{"seconds": float64(5), "clips": float64(2)},
 		EstimatedTier:    "base",
 	}
+
+	require.NoError(t, model.DB.Create(task).Error)
 
 	settled := settleTaskBillingOnComplete(
 		ctx,
@@ -1603,6 +1628,8 @@ func TestSettle_TieredUsageFactsMergeCompletionOverSubmission(t *testing.T) {
 				EstimatedTier:    "base",
 			}
 
+			require.NoError(t, model.DB.Create(task).Error)
+
 			settled := settleTaskBillingOnComplete(
 				context.Background(),
 				&mockAdaptor{},
@@ -1651,6 +1678,8 @@ func TestSettle_TieredSnapshotWriteBackUsesSettledFactsAndMatchedTier(t *testing
 		UsageFacts:       map[string]any{"resolution": "720P", "seconds": float64(5)},
 		EstimatedTier:    "720P",
 	}
+
+	require.NoError(t, model.DB.Create(task).Error)
 
 	settled := settleTaskBillingOnComplete(
 		context.Background(),
@@ -1728,6 +1757,8 @@ func TestSettle_TokenRecalcFallsBackToCompletionTokens(t *testing.T) {
 			seedChannel(t, channelID)
 
 			task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceWallet, 0)
+			require.NoError(t, model.DB.Create(task).Error)
+
 			settled := settleTaskBillingOnComplete(
 				context.Background(),
 				&mockAdaptor{},
@@ -1743,4 +1774,36 @@ func TestSettle_TokenRecalcFallsBackToCompletionTokens(t *testing.T) {
 			assert.Equal(t, testCase.wantQuota, task.Quota)
 		})
 	}
+}
+
+func TestTaskRefundRollsBackAllAccountingWhenTokenWriteFails(t *testing.T) {
+	truncate(t)
+	const userID, tokenID, channelID, amount = 9180, 9180, 9180, 1200
+	seedUser(t, userID, 5000)
+	seedToken(t, tokenID, userID, "atomic-refund-token", 1000)
+	seedChannel(t, channelID)
+	seedChargedAccounting(t, userID, channelID, tokenID, amount, 1)
+	task := makeTask(userID, channelID, amount, tokenID, BillingSourceWallet, 0)
+	task.Status = model.TaskStatusFailure
+	require.NoError(t, model.DB.Create(task).Error)
+	stale := *task
+	const callback = "test_task_token_write_failure"
+	require.NoError(t, model.DB.Callback().Update().Before("gorm:update").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement.Table == "tokens" {
+			tx.AddError(fmt.Errorf("injected token write failure"))
+		}
+	}))
+	t.Cleanup(func() { model.DB.Callback().Update().Remove(callback) })
+	require.False(t, RefundTaskQuota(t.Context(), task, "failed task"))
+	require.Equal(t, 5000, getUserQuota(t, userID))
+	require.Equal(t, 1000, getTokenRemainQuota(t, tokenID))
+	require.Equal(t, amount, getTaskQuota(t, task.ID))
+	require.Zero(t, countLogs(t))
+	require.NoError(t, model.DB.Callback().Update().Remove(callback))
+	require.True(t, RefundTaskQuota(t.Context(), task, "failed task"))
+	require.True(t, RefundTaskQuota(t.Context(), &stale, "duplicate failed task"))
+	require.Equal(t, 6200, getUserQuota(t, userID))
+	require.Equal(t, 2200, getTokenRemainQuota(t, tokenID))
+	require.Zero(t, getTaskQuota(t, task.ID))
+	require.EqualValues(t, 1, countLogs(t))
 }

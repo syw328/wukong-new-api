@@ -122,3 +122,43 @@ func TestPlatformBalanceQuotaClampsToWalletRange(t *testing.T) {
 	_, ok = PlatformBalanceQuota(math.NaN())
 	require.False(t, ok)
 }
+
+func TestPlatformMediaMirrorDoesNotReserveUserWallet(t *testing.T) {
+	platformWallet(t, "2.17")
+	info := seedPlatformMember(t, 9110)
+	c := platformRelayContext()
+	c.Set("platform", "platform-media")
+	const estimate = 4_285_000 // 8.57 platform credits
+	require.Nil(t, PreConsumeBilling(c, estimate, info))
+	assertQuota := func() {
+		t.Helper()
+		quota, err := model.GetUserQuota(info.UserId, false)
+		require.NoError(t, err)
+		require.Equal(t, 1_085_000, quota, "the platform owns the wallet; the portal must not subtract its budget")
+	}
+	assertQuota()
+	require.NoError(t, info.Billing.Settle(700_000))
+	assertQuota()
+}
+
+func TestPlatformMediaMirrorPreservesTokenBudgetAndOtherWalletContracts(t *testing.T) {
+	for _, platform := range []string{"platform-media", "other-provider"} {
+		t.Run(platform, func(t *testing.T) {
+			platformWallet(t, "2.17")
+			info := seedPlatformMember(t, 9111)
+			c := platformRelayContext()
+			c.Set("platform", platform)
+			if platform == "platform-media" {
+				info.TokenUnlimited = false
+				require.NoError(t, model.DB.Model(&model.Token{}).Where("id = ?", info.TokenId).Update("remain_quota", 1).Error)
+			}
+			err := PreConsumeBilling(c, 4_285_000, info)
+			require.NotNil(t, err)
+			if platform == "platform-media" {
+				require.Equal(t, types.ErrorCodePreConsumeTokenQuotaFailed, err.GetErrorCode())
+			} else {
+				require.Equal(t, types.ErrorCodeInsufficientUserQuota, err.GetErrorCode())
+			}
+		})
+	}
+}

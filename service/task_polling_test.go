@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1111,7 +1112,26 @@ func TestPlatformMediaPollingDatabaseMatrix(t *testing.T) {
 				common.SetDatabaseTypes(oldMain, oldLog)
 				require.NoError(t, sqlDB.Close())
 			})
-			require.NoError(t, db.AutoMigrate(&model.Task{}, &model.User{}, &model.Token{}, &model.Log{}, &model.Channel{}))
+			require.NoError(t, db.AutoMigrate(&model.Task{}, &model.User{}, &model.Token{}, &model.Log{}, &model.Channel{}, &model.UserSubscription{}, &model.Midjourney{}, &model.TopUp{}, &model.SystemTaskLock{}, &model.SystemTask{}))
+			// Model the previous release's tasks table, then upgrade it twice.
+			for _, column := range []string{"last_polled_at", "billing_pending"} {
+				require.NoError(t, db.Migrator().DropIndex(&model.Task{}, "idx_tasks_"+column))
+			}
+			for _, column := range []string{"last_polled_at", "billing_pending"} {
+				require.NoError(t, db.Migrator().DropColumn(&model.Task{}, column))
+			}
+			require.NoError(t, db.Table("tasks").Create(map[string]any{
+				"task_id": "legacy_upgrade_fixture", "status": "FAILURE", "progress": "100%", "quota": 123,
+			}).Error)
+			for range 2 {
+				require.NoError(t, db.AutoMigrate(&model.Task{}))
+			}
+			var historical model.Task
+			require.NoError(t, db.Where("task_id = ?", "legacy_upgrade_fixture").First(&historical).Error)
+			require.False(t, historical.BillingPending, "migration must not invent historical refunds")
+			require.Zero(t, historical.LastPolledAt)
+			require.Equal(t, 123, historical.Quota)
+			require.NoError(t, db.Delete(&historical).Error)
 			query := "SELECT version()"
 			if dialect.name == common.DatabaseTypeSQLite {
 				query = "SELECT sqlite_version()"
@@ -1119,9 +1139,177 @@ func TestPlatformMediaPollingDatabaseMatrix(t *testing.T) {
 			var version string
 			require.NoError(t, db.Raw(query).Scan(&version).Error)
 			t.Logf("database: %s", version)
+			t.Run("fair bounded polling", TestTaskPollingFairlyVisitsBeyondAnUnresolvedBatch)
+			t.Run("atomic refund", TestTaskRefundRollsBackAllAccountingWhenTokenWriteFails)
+			t.Run("durable terminal recovery", TestTaskPollingRecoversCommittedTerminalWithoutRepeatingGeneration)
+			t.Run("external log recovery", TestTaskSettlementExternalLogFailureDoesNotRepeatWalletChanges)
 			t.Run("slow task isolation", TestPlatformMediaPollingSlowTaskDoesNotBlockTheSameChannel)
 			t.Run("outage preserves authoritative billing", TestPlatformMediaPollingOutageDoesNotInventFailureOrRefund)
 			t.Run("concurrent stale results refund once", TestUpdateSunoTasksStalePollsRefundExactlyOnce)
 		})
 	}
+}
+
+func TestTaskPollingFairlyVisitsBeyondAnUnresolvedBatch(t *testing.T) {
+	truncate(t)
+	const count = 1001
+	for i := range count {
+		task := makeTask(1, 1, 0, 0, BillingSourceWallet, 0)
+		task.TaskID = fmt.Sprintf("fair-poll-%d", i)
+		task.Platform = "platform-media"
+		require.NoError(t, model.DB.Create(task).Error)
+	}
+	first := model.GetAllUnFinishSyncTasks(1000)
+	require.Len(t, first, 1000)
+	second := model.GetAllUnFinishSyncTasks(1000)
+	require.Len(t, second, 1000)
+	require.Equal(t, "fair-poll-1000", second[0].TaskID, "unresolved old tasks must not starve later tasks")
+	for _, task := range second {
+		require.Equal(t, model.TaskStatus(model.TaskStatusInProgress), task.Status)
+	}
+}
+
+func TestTaskPollingRecoversCommittedTerminalWithoutRepeatingGeneration(t *testing.T) {
+	for _, actual := range []int{0, 300} {
+		t.Run(fmt.Sprintf("actual_%d", actual), func(t *testing.T) {
+			truncate(t)
+			previousLimit := constant.TaskQueryLimit
+			constant.TaskQueryLimit = 1000
+			t.Cleanup(func() { constant.TaskQueryLimit = previousLimit })
+			const userID, tokenID, channelID, amount = 9190, 9190, 9190, 1200
+			seedUser(t, userID, 5000)
+			seedToken(t, tokenID, userID, "recover-task-token", 1000)
+			seedChannel(t, channelID)
+			seedChargedAccounting(t, userID, channelID, tokenID, amount, 1)
+			task := makeTask(userID, channelID, amount, tokenID, BillingSourceWallet, 0)
+			task.Platform = "platform-media"
+			require.NoError(t, model.DB.Create(task).Error)
+			const callback = "test_recover_token_write_failure"
+			require.NoError(t, model.DB.Callback().Update().Before("gorm:update").Register(callback, func(tx *gorm.DB) {
+				if tx.Statement.Table == "tokens" {
+					tx.AddError(fmt.Errorf("injected token write failure"))
+				}
+			}))
+			t.Cleanup(func() { model.DB.Callback().Update().Remove(callback) })
+			require.NoError(t, failTaskFromPoll(t.Context(), &mockAdaptor{adjustReturn: actual}, task, task.Status, "confirmed failure"))
+			var pending model.Task
+			require.NoError(t, model.DB.First(&pending, task.ID).Error)
+			require.Equal(t, model.TaskStatus(model.TaskStatusFailure), pending.Status)
+			require.True(t, pending.BillingPending)
+			require.NotNil(t, pending.PrivateData.PendingBillingResult)
+			require.Equal(t, 5000, getUserQuota(t, userID))
+			require.NoError(t, model.DB.Callback().Update().Remove(callback))
+			previousFactory := GetTaskAdaptorFunc
+			GetTaskAdaptorFunc = func(constant.TaskPlatform) TaskPollingAdaptor {
+				return &mockAdaptor{adjustReturn: actual}
+			}
+			t.Cleanup(func() { GetTaskAdaptorFunc = previousFactory })
+			RunTaskPollingOnce(t.Context(), nil)
+			RunTaskPollingOnce(t.Context(), nil)
+			require.NoError(t, model.DB.First(&pending, task.ID).Error)
+			require.False(t, pending.BillingPending)
+			require.Nil(t, pending.PrivateData.PendingBillingResult)
+			require.Equal(t, 6200-actual, getUserQuota(t, userID))
+			require.Equal(t, 2200-actual, getTokenRemainQuota(t, tokenID))
+			require.EqualValues(t, 1, countLogs(t))
+		})
+	}
+}
+
+func TestTaskSettlementExternalLogFailureDoesNotRepeatWalletChanges(t *testing.T) {
+	truncate(t)
+	const userID, amount = 9191, 1200
+	seedUser(t, userID, 5000)
+	task := makeTask(userID, 0, amount, 0, BillingSourceWallet, 0)
+	task.Status, task.BillingPending = model.TaskStatusFailure, true
+	task.PrivateData.PendingBillingResult = relaycommon.FailTaskInfo("confirmed failure")
+	require.NoError(t, model.DB.Create(task).Error)
+	logs, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, logs.AutoMigrate(&model.Log{}))
+	previousLogs := model.LOG_DB
+	model.LOG_DB = logs
+	t.Cleanup(func() {
+		model.LOG_DB = previousLogs
+		sqlDB, err := logs.DB()
+		require.NoError(t, err)
+		require.NoError(t, sqlDB.Close())
+	})
+	const callback = "test_external_log_write_failure"
+	require.NoError(t, logs.Callback().Create().Before("gorm:create").Register(callback, func(tx *gorm.DB) { tx.AddError(fmt.Errorf("log database unavailable")) }))
+	require.False(t, RefundTaskQuota(t.Context(), task, "confirmed failure"))
+	require.Equal(t, 6200, getUserQuota(t, userID), "primary accounting is committed independently of log delivery")
+	var pending model.Task
+	require.NoError(t, model.DB.First(&pending, task.ID).Error)
+	require.True(t, pending.BillingPending)
+	require.Zero(t, pending.Quota)
+	require.Nil(t, pending.PrivateData.PendingBillingResult)
+	require.NotNil(t, pending.PrivateData.PendingBillingLog)
+	require.NoError(t, logs.Callback().Create().Remove(callback))
+	// Simulate the insert succeeding but its acknowledgement being interrupted.
+	published := *pending.PrivateData.PendingBillingLog
+	require.NoError(t, logs.Create(&published).Error)
+	require.NoError(t, model.FlushTaskBillingLog(&pending))
+	require.NoError(t, model.FlushTaskBillingLog(&pending))
+	require.False(t, pending.BillingPending)
+	require.Equal(t, 6200, getUserQuota(t, userID))
+	var count int64
+	require.NoError(t, logs.Model(&model.Log{}).Count(&count).Error)
+	require.EqualValues(t, 1, count)
+}
+
+func TestTaskBillingLogConcurrentSQLiteWorkersPublishOnce(t *testing.T) {
+	primary, err := gorm.Open(sqlite.Open(t.TempDir()+"/primary.db?_pragma=busy_timeout(0)"), &gorm.Config{})
+	require.NoError(t, err)
+	logs, err := gorm.Open(sqlite.Open(t.TempDir()+"/logs.db"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, primary.AutoMigrate(&model.Task{}))
+	require.NoError(t, logs.AutoMigrate(&model.Log{}))
+	previousDB, previousLogs := model.DB, model.LOG_DB
+	previousMain, previousLog := common.MainDatabaseType(), common.LogDatabaseType()
+	model.DB, model.LOG_DB = primary, logs
+	common.SetDatabaseTypes(common.DatabaseTypeSQLite, common.DatabaseTypeSQLite)
+	t.Cleanup(func() {
+		model.DB, model.LOG_DB = previousDB, previousLogs
+		common.SetDatabaseTypes(previousMain, previousLog)
+		for _, db := range []*gorm.DB{primary, logs} {
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			require.NoError(t, sqlDB.Close())
+		}
+	})
+	pool, err := primary.DB()
+	require.NoError(t, err)
+	pool.SetMaxOpenConns(2)
+	task := &model.Task{TaskID: "concurrent-log", Status: model.TaskStatusFailure, BillingPending: true,
+		PrivateData: model.TaskPrivateData{PendingBillingLog: &model.Log{RequestId: "concurrent-settlement-receipt", Type: model.LogTypeRefund, Quota: 100}}}
+	require.NoError(t, primary.Create(task).Error)
+	first, second := *task, *task
+	countRead, release := make(chan struct{}), make(chan struct{})
+	var firstRead atomic.Bool
+	require.NoError(t, logs.Callback().Query().After("gorm:query").Register("test_pause_first_log_lookup", func(tx *gorm.DB) {
+		if tx.Statement.Table == "logs" && firstRead.CompareAndSwap(false, true) {
+			close(countRead)
+			select {
+			case <-release:
+			case <-t.Context().Done():
+			}
+		}
+	}))
+	firstDone := make(chan error, 1)
+	go func() { firstDone <- model.FlushTaskBillingLog(&first) }()
+	select {
+	case <-countRead:
+	case <-time.After(5 * time.Second):
+		t.Fatal("first log lookup did not start")
+	}
+	secondErr := model.FlushTaskBillingLog(&second)
+	close(release)
+	require.NoError(t, <-firstDone)
+	if secondErr != nil {
+		require.NoError(t, model.FlushTaskBillingLog(&second))
+	}
+	var count int64
+	require.NoError(t, logs.Model(&model.Log{}).Count(&count).Error)
+	require.EqualValues(t, 1, count)
 }

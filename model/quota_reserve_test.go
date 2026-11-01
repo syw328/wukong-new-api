@@ -259,3 +259,37 @@ func TestTokenCacheInitPreservesLiveQuotaAndFenceBlocksStaleSnapshot(t *testing.
 	require.NoError(t, err)
 	assert.Equal(t, 100, cached.RemainQuota)
 }
+
+func TestTaskSettlementPreservesUnflushedBatchReservations(t *testing.T) {
+	truncateTables(t)
+	resetBatchUpdateTestState(t)
+	useUserCacheMiniRedis(t)
+	common.BatchUpdateEnabled = true
+	user := createReserveTestUser(t, 1000)
+	token := createReserveTestToken(t, 1000)
+	require.NoError(t, DB.Model(&token).Update("user_id", user.Id).Error)
+	reserved, err := TryReserveUserQuota(user.Id, 500)
+	require.NoError(t, err)
+	require.True(t, reserved)
+	reserved, err = TryReserveTokenQuota(token.Id, token.Key, 500, false)
+	require.NoError(t, err)
+	require.True(t, reserved)
+	task := &Task{TaskID: "batch-settlement", UserId: user.Id, Quota: 500, Status: TaskStatusSuccess,
+		PrivateData: TaskPrivateData{BillingSource: "wallet", TokenId: token.Id}}
+	require.NoError(t, DB.Create(task).Error)
+	require.NoError(t, ApplyTaskQuotaSettlement(task, 300, nil))
+	cachedUser, err := GetUserCache(user.Id)
+	require.NoError(t, err)
+	require.Equal(t, 700, cachedUser.Quota)
+	cachedToken, err := GetTokenByKey(token.Key, false)
+	require.NoError(t, err)
+	require.Equal(t, 700, cachedToken.RemainQuota)
+	require.Equal(t, 300, cachedToken.UsedQuota)
+	batchUpdate()
+	require.Equal(t, 700, getUserQuotaFromDB(t, user.Id))
+	require.Equal(t, 700, getTokenFromDB(t, token.Id).RemainQuota)
+	require.NoError(t, ApplyTaskQuotaSettlement(task, 300, nil))
+	cachedUser, err = GetUserCache(user.Id)
+	require.NoError(t, err)
+	require.Equal(t, 700, cachedUser.Quota)
+}

@@ -286,7 +286,8 @@ func TestPlatformImagesCompatibilityGeneratesSixModelsAndSettlesOnce(t *testing.
 	assert.Equal(t, 6, fixture.quotes)
 	var user model.User
 	require.NoError(t, model.DB.First(&user, 7).Error)
-	assert.Equal(t, 5_000_000-6*60_000, user.Quota, "native reservations must settle to measured platform cost once")
+	assert.Equal(t, 5_000_000, user.Quota, "the platform wallet mirror is refreshed from its authority, never locally reserved")
+	assert.Equal(t, 6*60_000, user.UsedQuota, "usage logs must still settle to measured platform cost once")
 }
 
 func TestPlatformImagesCompatibilityRejectsUnsafeRequestsAndPreservesOwnership(t *testing.T) {
@@ -377,5 +378,6 @@ func TestPlatformImagesCompatibilityResumesAfterInterruptedWait(t *testing.T) {
 	assert.Equal(t, 1, fixture.quotes)
 	var user model.User
 	require.NoError(t, model.DB.First(&user, 7).Error)
-	assert.Equal(t, 5_000_000-60_000, user.Quota)
+	assert.Equal(t, 5_000_000, user.Quota)
+	assert.Equal(t, 60_000, user.UsedQuota)
 }

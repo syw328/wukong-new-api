@@ -73,6 +73,16 @@ func (w *WalletFunding) Refund() error {
 	return model.IncreaseUserQuota(w.userId, w.consumed, false)
 }
 
+// PlatformMirrorFunding leaves the platform wallet authoritative. Token budgets
+// still reserve and settle through BillingSession; a portal read refreshes the
+// displayed balance. Persisting this source keeps historical wallet holds distinct.
+type PlatformMirrorFunding struct{}
+
+func (*PlatformMirrorFunding) Source() string       { return BillingSourcePlatformMirror }
+func (*PlatformMirrorFunding) PreConsume(int) error { return nil }
+func (*PlatformMirrorFunding) Settle(int) error     { return nil }
+func (*PlatformMirrorFunding) Refund() error        { return nil }
+
 // ---------------------------------------------------------------------------
 // SubscriptionFunding — 订阅资金来源实现
 // ---------------------------------------------------------------------------
