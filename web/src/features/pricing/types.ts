@@ -132,6 +132,19 @@ export type PricingData = {
   auto_groups: string[]
 }
 
+export type LatencyTimePoint = {
+  timestamp: string
+  group: string
+  ttft_ms: number
+}
+
+export type UptimeDayPoint = {
+  date: string
+  uptime_pct: number
+  incidents: number
+  outage_minutes: number
+}
+
 export type TokenUnit = 'M' | 'K'
 export type PriceType =
   | 'input'

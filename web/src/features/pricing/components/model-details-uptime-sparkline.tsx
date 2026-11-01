@@ -30,7 +30,7 @@ import {
 } from '@/features/performance-metrics/lib/format'
 import { cn } from '@/lib/utils'
 
-import type { UptimeDayPoint } from '../lib/mock-stats'
+import type { UptimeDayPoint } from '../types'
 
 // ---------------------------------------------------------------------------
 // Uptime sparkline
