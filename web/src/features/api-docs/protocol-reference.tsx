@@ -14,6 +14,7 @@ import type { PlatformModel } from '@/features/platform-models/types'
 import { portalApiOrigin } from '@/lib/portal-runtime'
 
 import {
+  rechargeGuidance, rechargeRecovery, rechargeRequest, rechargeQuery, rechargeResponse,
   balanceGuidance,
   balanceRequest,
   balanceResponse,
@@ -69,6 +70,24 @@ export function ProtocolReference(props: { model?: PlatformModel }) {
         <pre className='bg-muted/20 overflow-auto rounded-xl border p-4 text-xs leading-6'>
           <code>{JSON.stringify(balanceResponse, null, 2)}</code>
         </pre>
+      </section>
+      <section className='space-y-4' aria-label={t('Recharge by API')}>
+        <h2 className='text-xl font-semibold'>{t('Recharge by API')}</h2>
+        <p className='text-muted-foreground text-sm leading-6'>{t(rechargeGuidance)}</p>
+        <p className='text-muted-foreground text-sm leading-6'>{t(rechargeRecovery)}</p>
+        {[
+          { title: 'POST /recharge/orders', code: rechargeRequest(base), label: 'Copy recharge request' },
+          { title: 'GET /recharge/orders/{id}', code: rechargeQuery(base), label: 'Copy recharge query' },
+        ].map((example) => (
+          <div key={example.title} className='overflow-hidden rounded-xl border'>
+            <div className='bg-muted/30 flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2'>
+              <span className='text-sm break-all'>{example.title}</span>
+              <CopyButton value={example.code} aria-label={t(example.label)} size='sm' />
+            </div>
+            <pre className='overflow-auto p-4 text-xs leading-6'><code>{example.code}</code></pre>
+          </div>
+        ))}
+        <pre className='bg-muted/20 overflow-auto rounded-xl border p-4 text-xs leading-6'><code>{JSON.stringify(rechargeResponse, null, 2)}</code></pre>
       </section>
       {!props.model && (
         <section className='space-y-4'>

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -54,6 +55,7 @@ func proxyPlatformPortal(c *gin.Context, path string, accountPrice bool, mediaQu
 	}
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Idempotency-Key", c.GetHeader("Idempotency-Key"))
 	if (accountPrice && c.GetInt("id") > 0) || mediaQuote {
 		headers, identityErr := service.PlatformRelayIdentityHeaders(c.GetInt("id"))
 		if identityErr != nil {
@@ -92,7 +94,7 @@ func proxyPlatformPortal(c *gin.Context, path string, accountPrice bool, mediaQu
 	}
 	response, err := platformPortalClient.Do(request)
 	if err != nil {
-		c.JSON(503, gin.H{"success": false, "message": "Unable to load platform data; retry the read request"})
+		c.JSON(503, gin.H{"success": false, "message": "Platform request result is unknown; retry with the same Idempotency-Key or query the original order"})
 		return
 	}
 	defer response.Body.Close()
@@ -133,4 +135,12 @@ func GetPlatformMediaTemplate(c *gin.Context) {
 		return
 	}
 	common.ApiSuccess(c, gin.H{"source": source})
+}
+
+// Recharge identity comes from the authenticated key owner's platform binding.
+func PostPlatformRecharge(c *gin.Context) {
+	proxyPlatformPortal(c, "/api/developer/relay-recharge/orders", true, false)
+}
+func GetPlatformRecharge(c *gin.Context) {
+	proxyPlatformPortal(c, "/api/developer/relay-recharge/orders/"+url.PathEscape(c.Param("order_id")), true, false)
 }

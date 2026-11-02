@@ -109,6 +109,8 @@ it('full document copy contains the current model, request parameters and both c
   expect(text).toContain('```python')
   expect(text).toContain('```sh')
   expect(text).toContain('/v1/balance')
+  expect(text).toContain('/v1/recharge/orders')
+  expect(text).toContain('qr_code_image')
   expect(text).not.toContain('chat-one')
 })
 
@@ -185,4 +187,18 @@ it('the narrow-screen directory toggle exposes its expanded state and closes aft
   expect(toggle).toHaveAttribute('aria-expanded', 'true')
   await user.click(screen.getByRole('button', { name: /Chat One/ }))
   expect(toggle).toHaveAttribute('aria-expanded', 'false')
+})
+
+it('recharge documentation copies create and query examples for the current gateway', async () => {
+  const user = userEvent.setup()
+  setup()
+  expect(screen.getByRole('heading', { name: 'Recharge by API' })).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Copy recharge request' }))
+  const create = await navigator.clipboard.readText()
+  expect(create).toContain('/v1/recharge/orders')
+  expect(create).toContain('Idempotency-Key: recharge-order-001')
+  expect(create).toContain('"amount":"12.34"')
+  await user.click(screen.getByRole('button', { name: 'Copy recharge query' }))
+  expect(await navigator.clipboard.readText()).toContain('/v1/recharge/orders/$ORDER_ID')
+  expect(screen.getByText(/"qr_code_image":/)).toBeVisible()
 })

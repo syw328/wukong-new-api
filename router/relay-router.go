@@ -16,6 +16,8 @@ func SetRelayRouter(router *gin.Engine) {
 	router.Use(middleware.DecompressRequestMiddleware())
 	router.Use(middleware.BodyStorageCleanup()) // 清理请求体存储
 	router.Use(middleware.StatsMiddleware())
+	router.POST("/v1/recharge/orders", middleware.RouteTag("relay"), middleware.TokenAuth(), controller.PostPlatformRecharge)
+	router.GET("/v1/recharge/orders/:order_id", middleware.RouteTag("relay"), middleware.TokenAuth(), controller.GetPlatformRecharge)
 	router.GET("/v1/balance", middleware.RouteTag("relay"), middleware.TokenAuth(), controller.GetPlatformBalance)
 	// https://platform.openai.com/docs/api-reference/introduction
 	modelsRouter := router.Group("/v1/models")
