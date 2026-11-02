@@ -66,6 +66,7 @@ function setup(initial = '', data: PlatformModel[] | undefined = models) {
 afterEach(() => {
   client?.clear()
   vi.restoreAllMocks()
+  document.querySelector('#platform-portal-runtime')?.remove()
 })
 
 it('search and category filters narrow the directory, and choosing a model opens its actual request examples', async () => {
@@ -107,7 +108,33 @@ it('full document copy contains the current model, request parameters and both c
   expect(text).toContain('/v1/media/generations/{task_id}')
   expect(text).toContain('```python')
   expect(text).toContain('```sh')
+  expect(text).toContain('/v1/balance')
   expect(text).not.toContain('chat-one')
+})
+
+it('the shared balance guide copies the current site request and explains credits', async () => {
+  const user = userEvent.setup()
+  const runtime = document.createElement('script')
+  runtime.id = 'platform-portal-runtime'
+  runtime.type = 'application/json'
+  runtime.textContent = JSON.stringify({
+    origin: window.location.origin,
+    basePath: '/api',
+    transportPath: '/api/open-platform',
+  })
+  document.body.append(runtime)
+  setup()
+  expect(
+    screen.getByRole('heading', { name: 'Query credit balance' })
+  ).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Copy balance request' }))
+  expect(await navigator.clipboard.readText()).toContain(
+    `${window.location.origin}/api/open-platform/v1/balance`
+  )
+  expect(await navigator.clipboard.readText()).toContain(
+    'Authorization: Bearer $PLATFORM_API_KEY'
+  )
+  expect(screen.getByText(/"unit": "credits"/)).toBeVisible()
 })
 
 it('an unknown deep link shows an unavailable document instead of silently selecting another model', () => {

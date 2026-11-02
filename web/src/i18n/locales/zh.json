@@ -6785,6 +6785,9 @@
     "Zhipu": "智谱",
     "Zhipu GLM": "智谱GLM",
     "Zhipu V4": "智谱 V4",
-    "Zoom": "缩放"
+    "Zoom": "缩放",
+    "Query credit balance": "查询算力余额",
+    "Copy balance request": "复制余额查询请求",
+    "Query the current account balance with the same API key. This read is free and uncached. data.balance is in credits (unit: credits), not currency or the key quota; queried_at is the query time. Committed top-ups and charges appear on the next query. No user ID or model is required.": "使用同一把 API Key 查询当前账号余额。查询免费且不缓存。data.balance 的单位为算力（unit: credits），不是人民币或密钥限额；queried_at 为查询时间。充值或消费提交入账后，下次查询即可读取新值。无需用户 ID 或模型。"
   }
 }

@@ -6785,6 +6785,9 @@
     "Zhipu": "Zhipu",
     "Zhipu GLM": "Zhipu GLM",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Query credit balance": "Tra cứu số dư tín dụng",
+    "Copy balance request": "Sao chép yêu cầu số dư",
+    "Query the current account balance with the same API key. This read is free and uncached. data.balance is in credits (unit: credits), not currency or the key quota; queried_at is the query time. Committed top-ups and charges appear on the next query. No user ID or model is required.": "Dùng cùng khóa API để tra cứu số dư tài khoản hiện tại. Truy vấn miễn phí và không lưu bộ nhớ đệm. data.balance có đơn vị tín dụng (unit: credits), không phải tiền tệ hay hạn mức khóa; queried_at là thời gian truy vấn. Khoản nạp và phí đã ghi nhận sẽ xuất hiện ở truy vấn tiếp theo. Không cần ID người dùng hoặc mô hình."
   }
 }

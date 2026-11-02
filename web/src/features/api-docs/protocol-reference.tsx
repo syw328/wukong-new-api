@@ -14,6 +14,9 @@ import type { PlatformModel } from '@/features/platform-models/types'
 import { portalApiOrigin } from '@/lib/portal-runtime'
 
 import {
+  balanceGuidance,
+  balanceRequest,
+  balanceResponse,
   protocolEndpoints,
   requestFields,
   recoveryGuidance,
@@ -44,6 +47,28 @@ export function ProtocolReference(props: { model?: PlatformModel }) {
             'For OpenAI SDKs, use the Base URL above including /v1. Do not add /v1 twice. Keep keys out of browser code and public repositories.'
           )}
         </p>
+      </section>
+      <section className='space-y-4' aria-label={t('Query credit balance')}>
+        <h2 className='text-xl font-semibold'>{t('Query credit balance')}</h2>
+        <p className='text-muted-foreground text-sm leading-6'>
+          {t(balanceGuidance)}
+        </p>
+        <div className='overflow-hidden rounded-xl border'>
+          <div className='bg-muted/30 flex items-center justify-between border-b px-4 py-2'>
+            <span className='text-sm'>GET /balance</span>
+            <CopyButton
+              value={balanceRequest(base)}
+              aria-label={t('Copy balance request')}
+              size='sm'
+            />
+          </div>
+          <pre className='overflow-auto p-4 text-xs leading-6'>
+            <code>{balanceRequest(base)}</code>
+          </pre>
+        </div>
+        <pre className='bg-muted/20 overflow-auto rounded-xl border p-4 text-xs leading-6'>
+          <code>{JSON.stringify(balanceResponse, null, 2)}</code>
+        </pre>
       </section>
       {!props.model && (
         <section className='space-y-4'>

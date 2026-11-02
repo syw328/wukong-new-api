@@ -6785,6 +6785,9 @@
     "Zhipu": "Zhipu",
     "Zhipu GLM": "Zhipu GLM",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Query credit balance": "Запросить баланс кредитов",
+    "Copy balance request": "Копировать запрос баланса",
+    "Query the current account balance with the same API key. This read is free and uncached. data.balance is in credits (unit: credits), not currency or the key quota; queried_at is the query time. Committed top-ups and charges appear on the next query. No user ID or model is required.": "Используйте тот же API-ключ для запроса баланса аккаунта. Запрос бесплатный, без кеширования. data.balance выражен в кредитах (unit: credits), а не в валюте или лимите ключа; queried_at — время запроса. Зачисленные пополнения и списания видны при следующем запросе. ID пользователя и модель не нужны."
   }
 }

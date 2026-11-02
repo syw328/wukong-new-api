@@ -115,6 +115,13 @@ func proxyPlatformPortal(c *gin.Context, path string, accountPrice bool, mediaQu
 func GetPlatformCatalog(c *gin.Context) {
 	proxyPlatformPortal(c, "/api/developer/platform-catalog", false, false)
 }
+func GetPlatformBalance(c *gin.Context) {
+	if c.GetInt("id") <= 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "API key required"})
+		return
+	}
+	proxyPlatformPortal(c, "/api/developer/relay-balance", true, false)
+}
 func PostPlatformModelPrices(c *gin.Context) {
 	proxyPlatformPortal(c, "/api/developer/model-prices", true, false)
 }

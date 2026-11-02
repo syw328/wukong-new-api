@@ -6785,6 +6785,9 @@
     "Zhipu": "Zhipu",
     "Zhipu GLM": "Zhipu GLM",
     "Zhipu V4": "Zhipu V 4",
-    "Zoom": "ズーム"
+    "Zoom": "ズーム",
+    "Query credit balance": "クレジット残高を照会",
+    "Copy balance request": "残高照会リクエストをコピー",
+    "Query the current account balance with the same API key. This read is free and uncached. data.balance is in credits (unit: credits), not currency or the key quota; queried_at is the query time. Committed top-ups and charges appear on the next query. No user ID or model is required.": "同じ API キーで現在のアカウント残高を照会します。照会は無料でキャッシュされません。data.balance の単位はクレジット（unit: credits）で、通貨やキーの上限ではありません。queried_at は照会時刻です。入金や利用料金の確定後、次の照会に反映されます。ユーザー ID やモデルは不要です。"
   }
 }

@@ -9,6 +9,19 @@ import type {
 } from '@/features/platform-models/types'
 
 type Row = [string, string, string]
+export const balanceGuidance =
+  'Query the current account balance with the same API key. This read is free and uncached. data.balance is in credits (unit: credits), not currency or the key quota; queried_at is the query time. Committed top-ups and charges appear on the next query. No user ID or model is required.'
+export function balanceRequest(base: string): string {
+  return `curl --fail-with-body "${base}/balance" \\\n  -H "Authorization: Bearer $PLATFORM_API_KEY"`
+}
+export const balanceResponse = {
+  success: true,
+  data: {
+    balance: 125.5,
+    unit: 'credits',
+    queried_at: '2026-11-01T12:00:00.000Z',
+  },
+}
 export function protocolEndpoints(model: PlatformModel): Row[] {
   if (model.type === 'chat') {
     return [
@@ -107,6 +120,14 @@ export function modelDocument(
     t(
       'Create an API key in this site console and save it as the PLATFORM_API_KEY environment variable on your server. Use the same key for requests, task polling and artifact downloads.'
     ),
+    `## ${t('Query credit balance')}`,
+    t(balanceGuidance),
+    '```sh',
+    balanceRequest(`${root}/v1`),
+    '```',
+    '```json',
+    JSON.stringify(balanceResponse, null, 2),
+    '```',
     `## ${t('Endpoints and workflow')}`,
     ...protocolEndpoints(model).map(
       ([method, path, label]) => `${method} ${root}/v1${path} — ${t(label)}`
