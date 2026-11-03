@@ -120,6 +120,38 @@ func TestManageUserDisableAdvancesAuthVersionOnceAndRevokesSession(t *testing.T)
 	assert.Equal(t, model.UserSessionStatusRevoked, session.Status)
 }
 
+func TestCreateUserRejectsNonStandardRole(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	for i, test := range []struct {
+		name         string
+		role         int
+		operatorRole int
+	}{
+		{"between common and admin", 5, common.RoleAdminUser},
+		{"negative", -1, common.RoleAdminUser},
+		{"between admin and root", 99, common.RoleRootUser},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			username := fmt.Sprintf("odd-role-%d", i)
+			gin.SetMode(gin.TestMode)
+			recorder := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(recorder)
+			body := fmt.Sprintf(`{"username":%q,"password":"member-password-1","role":%d}`, username, test.role)
+			c.Request = httptest.NewRequest(http.MethodPost, "/api/user/", strings.NewReader(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+			c.Set("id", 9999)
+			c.Set("role", test.operatorRole)
+			CreateUser(c)
+
+			assert.Equal(t, http.StatusOK, recorder.Code)
+			assert.Contains(t, recorder.Body.String(), `"success":false`)
+			var count int64
+			require.NoError(t, db.Model(&model.User{}).Where("username = ?", username).Count(&count).Error)
+			assert.Zero(t, count)
+		})
+	}
+}
+
 func TestManageUserDemoteAdvancesAuthVersionAndRevokesSessionsOnce(t *testing.T) {
 	db := setupManageUserTestDB(t)
 	previousMaster := common.IsMasterNode
