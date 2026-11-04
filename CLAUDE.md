@@ -1,5 +1,8 @@
 # CLAUDE.md — Project Conventions for new-api
 
+> **悟空私有分支：** 下文要求读的 `AGENTS.md` 指本目录的 `newapi/AGENTS.md`，它开头的“悟空私有分支”一段优先；
+> 与仓库根 `AGENTS.md`（悟空总规则）冲突时一律以根规则为准。“遵守全部规则”不包括本仓不适用的 Issue/PR 流程和上游部署方式。
+
 ## MANDATORY: Read AGENTS.md with the Read tool
 
 Do not treat `@AGENTS.md` as loaded. Claude Code does not reliably inline that import.

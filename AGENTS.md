@@ -1,5 +1,19 @@
 # AGENTS.md — Project Conventions for new-api
 
+> **悟空私有分支：先读这段。** 这里是悟空 AI 聚合平台私有仓库里的 New API 分支。本目录下的规则文件
+> （本文件、`CLAUDE.md`、`web/AGENTS.md`、`.agents/`）与仓库根 `AGENTS.md` 冲突时，一律以根 `AGENTS.md` 为准，
+> 即使本文件所在目录更深。
+>
+> - Git、提交、推送（`npm run finish`）、部署、发布和付费验收只按根规则；不照 README 或 `docs/installation/` 的 Docker、宝塔方式部署。
+> - 不向上游 QuantumNous 或任何公开仓库开 Issue、PR 或提交内容；下文 Issues、Pull requests 两段和 `.agents/github/` 在本仓不适用。
+> - 门户价格由 `scripts/newapi-sync.mjs` 从平台同步（单位是算力，真实扣费在平台），不为新模型在 `builtin_billing.go` 加美元内置价。
+> - 改到数据库行为时以本仓实际使用的 PostgreSQL 实测为准；SQLite、MySQL 没条件实测就如实写明未测，不擅自安装 MySQL 或 Docker。
+>   代码仍保持三种数据库都能用的写法。
+> - 门户文案翻译按 `.agents/skills/i18n-translate`；分支行为写进根仓库的 `docs/operations/newapi-open-platform.md`，不改本文件记录。
+> - 未经用户同意，不运行 shadcn 的 `--overwrite`、`mcp init` 或其他会覆盖已改组件、改编辑器配置的命令。
+>
+> 下文的代码写法、计费安全、数据库兼容写法、测试质量和品牌保护条款照常遵守。
+
 DO NOT send optional commentary
 
 ## Overview
