@@ -1,6 +1,6 @@
 # AGENTS.md — Project Conventions for new-api
 
-> **悟空私有分支：先读这段。** 这里是悟空 AI 聚合平台私有仓库里的 New API 分支。本目录下的规则文件
+> **白猪私有分支：先读这段。** 这里是白猪AI 平台私有仓库里的 New API 分支。本目录下的规则文件
 > （本文件、`CLAUDE.md`、`web/AGENTS.md`、`.agents/`）与仓库根 `AGENTS.md` 冲突时，一律以根 `AGENTS.md` 为准，
 > 即使本文件所在目录更深。
 >
