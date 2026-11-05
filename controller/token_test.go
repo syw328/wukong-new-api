@@ -984,8 +984,8 @@ func TestTokenRoutingPolicyDatabaseMatrix(t *testing.T) {
 				require.NoError(t, err)
 				var bound model.PlatformKeyRoutingContext
 				require.NoError(t, common.Unmarshal(decoded, &bound))
-				assert.Equal(t, "cheapest", bound.DefaultStrategy)
-				assert.Equal(t, []string{"cheapest"}, bound.AllowedStrategies)
+				assert.Equal(t, "balanced", bound.DefaultStrategy)
+				assert.Equal(t, []string{"balanced"}, bound.AllowedStrategies)
 				assert.False(t, bound.AllowFixedRoutes)
 				assert.NotContains(t, string(decoded), token.Key)
 				require.Error(t, service.CheckKeyRoutingTarget(71, token.Id, false))

@@ -360,6 +360,35 @@ test('custom routing cancellation does not change the key draft', async () => {
   expect(payloads).toHaveLength(0)
 })
 
+test('a chosen Key strategy applies to all models without caller strategy overrides', async () => {
+  const payloads: Array<Record<string, unknown>> = []
+  installApiFixtures(payloads)
+  await renderCreateDrawer()
+  fireEvent.click(screen.getByRole('button', { name: /Success rate priority/ }))
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Configure models and routes' })
+  )
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Advanced routing permissions' })
+  )
+  expect(
+    screen.queryByRole('switch', { name: 'Allow callers to switch strategy' })
+  ).toBeNull()
+  expect(
+    screen.queryByRole('switch', { name: 'Allow fixed-route requests' })
+  ).toBeNull()
+  fireEvent.click(findButton('Apply configuration', true))
+  changeInput(getControlByLabel('Name'), 'reliable-key')
+  fireEvent.click(findButton('Save changes', true))
+  await waitFor(() => expect(payloads).toHaveLength(1))
+  expect(payloads[0]?.routing_policy).toMatchObject({
+    mode: 'automatic',
+    default_strategy: 'most_reliable',
+    allowed_strategies: ['most_reliable'],
+    model_rules: [],
+  })
+})
+
 test('custom route selection requires routes and saves exact manual order only with the key', async () => {
   const createdPayloads: Array<Record<string, unknown>> = []
   installApiFixtures(createdPayloads)

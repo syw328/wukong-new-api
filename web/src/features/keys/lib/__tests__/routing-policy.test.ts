@@ -27,4 +27,11 @@ describe('key route draft', () => {
     expect(next.allowed_strategies).toEqual(['cheapest'])
     expect(value.default_strategy).toBe('balanced')
   })
+  test('choosing a strategy replaces legacy caller overrides', () => {
+    const value = newRoutingPolicy()
+    value.allowed_strategies = ['balanced', 'cheapest']
+    const next = changeRoutingStrategy(value, 'most_reliable')
+    expect(next.allowed_strategies).toEqual(['most_reliable'])
+    expect(value.allowed_strategies).toEqual(['balanced', 'cheapest'])
+  })
 })

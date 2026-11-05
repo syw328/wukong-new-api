@@ -63,13 +63,9 @@ export function ApiKeyRoutingEditor(props: {
   const custom = policy?.mode === 'custom'
   const selectedMode = custom ? 'custom' : policy?.default_strategy
   function begin(makeCustom = false) {
-    const next = structuredClone(
-      policy || {
-        ...newRoutingPolicy(),
-        allowed_strategies: [...routingStrategies],
-        allow_fixed_routes: true,
-      }
-    )
+    const next = structuredClone(policy || newRoutingPolicy())
+    next.allowed_strategies = [next.default_strategy]
+    if (next.mode !== 'custom') next.model_rules = []
     if (makeCustom && next.mode !== 'custom') {
       next.version = 2
       next.mode = 'custom'
@@ -86,7 +82,7 @@ export function ApiKeyRoutingEditor(props: {
   function choose(strategy: RoutingStrategy) {
     const next = changeRoutingStrategy(policy || newRoutingPolicy(), strategy)
     next.mode = 'automatic'
-    if (custom) next.model_rules = []
+    next.model_rules = []
     props.form.setValue('routing_policy', next, {
       shouldDirty: true,
       shouldValidate: true,
@@ -121,7 +117,7 @@ export function ApiKeyRoutingEditor(props: {
       <SideDrawerSectionHeader
         title={t('Routing strategy')}
         description={t(
-          'Choose a default. Customize models and routes when you need more control.'
+          'This key uses the selected strategy for every model. Choose Custom routes to set model-specific routing.'
         )}
       />
       <div
@@ -167,9 +163,7 @@ export function ApiKeyRoutingEditor(props: {
                   0
                 ),
               })
-            : t('{{count}} model strategy rules', {
-                count: policy?.model_rules.length || 0,
-              })}
+            : t('All models use the key strategy')}
         </span>
         <Button type='button' variant='link' onClick={() => begin(custom)}>
           {t('Configure models and routes')}
@@ -277,24 +271,9 @@ export function ApiKeyRoutingEditor(props: {
             ))}
           </div>
         )}
-        {draft.mode !== 'custom' &&
-          draft.model_rules
-            .filter((rule) => !restricted || selected.includes(rule.model))
-            .map((rule) => (
-              <ModelRoutingRule
-                key={rule.model}
-                model={rule.model}
-                policy={draft}
-                onChange={setDraft}
-              />
-            ))}
         {(draft.mode !== 'custom' || step === 2) && (
           <div className='mt-5'>
-            <RoutingAdvanced
-              fixedOnly={draft.mode === 'custom'}
-              policy={draft}
-              onChange={setDraft}
-            />
+            <RoutingAdvanced policy={draft} onChange={setDraft} />
           </div>
         )}
         <p className='text-muted-foreground mt-4 text-xs'>

@@ -176,12 +176,17 @@ func (token *Token) PlatformRoutingContext(modelName string) (*PlatformKeyRoutin
 		}
 	}
 	result.Version, result.Mode = policy.Version, policy.Mode
-	result.DefaultStrategy, result.AllowedStrategies = policy.DefaultStrategy, slices.Clone(policy.AllowedStrategies)
+	result.DefaultStrategy, result.AllowedStrategies = policy.DefaultStrategy, []string{policy.DefaultStrategy}
 	result.AllowFixedRoutes = policy.AllowFixedRoutes
+	// Automatic Key strategies apply to every model, including stored v1 policies.
+	// Model-specific strategies and ordering belong only to explicit custom routing.
+	if policy.Version != 2 || policy.Mode != "custom" {
+		return result, nil
+	}
 	for _, rule := range policy.ModelRules {
 		if rule.Model == modelName {
 			result.RouteIDs, result.RouteOrder = slices.Clone(rule.RouteIDs), rule.RouteOrder
-			result.DefaultStrategy, result.AllowedStrategies = rule.DefaultStrategy, slices.Clone(rule.AllowedStrategies)
+			result.DefaultStrategy, result.AllowedStrategies = rule.DefaultStrategy, []string{rule.DefaultStrategy}
 			break
 		}
 	}

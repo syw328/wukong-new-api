@@ -2,7 +2,6 @@
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
   Collapsible,
   CollapsibleContent,
@@ -43,8 +42,6 @@ export function StrategySelect(props: {
 export function RoutingAdvanced(props: {
   policy: KeyRoutingPolicy
   onChange: (policy: KeyRoutingPolicy) => void
-  permissionsOnly?: boolean
-  fixedOnly?: boolean
 }) {
   const { t } = useTranslation()
   return (
@@ -53,68 +50,23 @@ export function RoutingAdvanced(props: {
         {t('Advanced routing permissions')}
       </CollapsibleTrigger>
       <CollapsibleContent className='space-y-4 pt-4'>
-        {!props.fixedOnly && (
-          <Label className='flex items-center justify-between gap-4'>
-            {t('Allow callers to switch strategy')}
-            <Switch
-              checked={props.policy.allowed_strategies.length > 1}
-              onCheckedChange={(checked) =>
-                props.onChange({
-                  ...props.policy,
-                  version: 2,
-                  mode: props.policy.mode || 'automatic',
-                  allowed_strategies: checked
-                    ? [...routingStrategies]
-                    : [props.policy.default_strategy],
-                })
-              }
-            />
-          </Label>
-        )}
-        {!props.fixedOnly && props.policy.allowed_strategies.length > 1 && (
-          <div className='grid grid-cols-2 gap-3'>
-            {routingStrategies.map((value) => (
-              <Label key={value} className='flex items-center gap-2 text-xs'>
-                <Checkbox
-                  checked={props.policy.allowed_strategies.includes(value)}
-                  disabled={value === props.policy.default_strategy}
-                  onCheckedChange={(checked) =>
-                    props.onChange({
-                      ...props.policy,
-                      allowed_strategies: checked
-                        ? [...props.policy.allowed_strategies, value]
-                        : props.policy.allowed_strategies.filter(
-                            (item) => item !== value
-                          ),
-                    })
-                  }
-                />
-                {t(labels[value])}
-              </Label>
-            ))}
-          </div>
-        )}
-        {!props.permissionsOnly && (
-          <>
-            <Label className='flex items-center justify-between gap-4'>
-              {t('Allow fixed-route requests')}
-              <Switch
-                checked={props.policy.allow_fixed_routes}
-                onCheckedChange={(checked) =>
-                  props.onChange({
-                    ...props.policy,
-                    allow_fixed_routes: checked,
-                  })
-                }
-              />
-            </Label>
-            <p className='text-muted-foreground text-xs'>
-              {t(
-                'Fixed routes and native Responses still obey your selected models and routes. They do not switch routes.'
-              )}
-            </p>
-          </>
-        )}
+        <Label className='flex items-center justify-between gap-4'>
+          {t('Allow native fixed-protocol requests')}
+          <Switch
+            checked={props.policy.allow_fixed_routes}
+            onCheckedChange={(checked) =>
+              props.onChange({
+                ...props.policy,
+                allow_fixed_routes: checked,
+              })
+            }
+          />
+        </Label>
+        <p className='text-muted-foreground text-xs'>
+          {t(
+            'Native Responses and legacy media protocols require this permission and do not switch routes. Native media uses the key strategy.'
+          )}
+        </p>
       </CollapsibleContent>
     </Collapsible>
   )
@@ -241,19 +193,6 @@ export function ModelRoutingRule(props: {
           </div>
         )
       })}
-      {!manual && (
-        <RoutingAdvanced
-          permissionsOnly
-          policy={{ ...props.policy, ...effective }}
-          onChange={(next) =>
-            update({
-              ...effective,
-              default_strategy: next.default_strategy,
-              allowed_strategies: next.allowed_strategies,
-            })
-          }
-        />
-      )}
       {props.policy.mode !== 'custom' && rule && (
         <Button
           type='button'

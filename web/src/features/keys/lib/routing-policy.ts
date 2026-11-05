@@ -33,10 +33,7 @@ export function changeRoutingStrategy(
     version: 2,
     mode: policy.mode || 'automatic',
     default_strategy: strategy,
-    allowed_strategies:
-      policy.allowed_strategies.length === 1
-        ? [strategy]
-        : [...new Set([...policy.allowed_strategies, strategy])],
+    allowed_strategies: [strategy],
   }
 }
 export function selectModelRoutes(

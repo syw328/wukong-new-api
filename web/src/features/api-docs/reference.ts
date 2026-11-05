@@ -89,7 +89,7 @@ export function requestFields(model: PlatformModel): Row[] {
           [
             'route_id',
             'string',
-            'Optional. Copy a published route ID to select that route; omit it for automatic routing.',
+            'Optional. A key with a saved strategy ignores route_id. Keys without a strategy can use it to pin a route.',
           ],
         ] as Row[])),
     [

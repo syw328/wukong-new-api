@@ -36,7 +36,7 @@ export function MediaRouteSelector(props: {
       <Label htmlFor='media-api-route'>{t('Generation route')}</Label>
       <p className='text-muted-foreground text-sm'>
         {t(
-          'Set route_id at the top level of both requests. The model ID stays the same. An explicit route never switches to another route; omit route_id for automatic selection.'
+          'Keys with a saved strategy use that strategy and its backup routes, regardless of route_id. Only keys without a strategy can pin a route.'
         )}
       </p>
       {props.loading && <p role='status'>{t('Loading routes…')}</p>}
