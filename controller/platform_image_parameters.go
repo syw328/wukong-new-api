@@ -18,8 +18,8 @@ type platformImageModel struct {
 		Required bool   `json:"required"`
 		Max      int    `json:"max"`
 		Options  []struct {
-			Value     string `json:"value"`
-			IsDefault bool   `json:"is_default"`
+			Value     any  `json:"value"`
+			IsDefault bool `json:"is_default"`
 		} `json:"options"`
 	} `json:"parameters"`
 }
@@ -50,7 +50,11 @@ func platformImageParameters(input map[string]any, model platformImageModel) (ma
 	for _, parameter := range model.Parameters {
 		definitions[parameter.Name] = nil
 		for _, option := range parameter.Options {
-			definitions[parameter.Name] = append(definitions[parameter.Name], option.Value)
+			// Dimensions and quality use textual choices; other catalog parameters
+			// can use numeric or boolean values and keep their JSON type.
+			if value, ok := option.Value.(string); ok {
+				definitions[parameter.Name] = append(definitions[parameter.Name], value)
+			}
 			if option.IsDefault {
 				params[parameter.Name] = option.Value
 			}

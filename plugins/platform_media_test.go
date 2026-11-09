@@ -43,6 +43,14 @@ func TestPlatformMediaNativeProtocol(t *testing.T) {
 		assert.Equal(t, request, submit["body"])
 		assert.Equal(t, 0.4, invoke("extractUsage", ctx)["platform_credits"])
 	})
+	t.Run("relays the complete signed authorization to the platform verifier", func(t *testing.T) {
+		longToken := strings.Repeat("a", 4500) + "." + strings.Repeat("b", 43)
+		request["authorization_token"] = longToken
+		defer func() { request["authorization_token"] = "signed-test-token" }()
+		submit := invoke("buildSubmitRequest", ctx)
+		assert.Equal(t, longToken, decode(submit["body"])["authorization_token"])
+		assert.Equal(t, 0.4, invoke("extractUsage", ctx)["platform_credits"])
+	})
 	t.Run("requires quote and rejects malformed bounds before the relay", func(t *testing.T) {
 		for _, cap := range []any{0, -1, 1000001, "0.4", nil} {
 			bad := map[string]any{"baseUrl": "https://platform.test", "requestBody": map[string]any{"model": "image-test", "authorization_max": cap}}

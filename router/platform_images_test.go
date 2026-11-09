@@ -111,7 +111,10 @@ func newPlatformImageTest(t *testing.T) *platformImageTest {
 				_, _ = io.WriteString(w, `{"success":false}`)
 				return
 			}
-			_, _ = io.WriteString(w, `{"success":true,"data":{"models":`+imageCompatibilityCatalog+`}}`)
+			// Real media catalogs mix image models with tools that use integer enum values.
+			catalog := strings.TrimSuffix(imageCompatibilityCatalog, "]") +
+				`,{"id":"tool-image-enhance","type":"image","available":true,"parameters":[{"name":"scale_factor","options":[{"value":2,"is_default":true}]}]}]`
+			_, _ = io.WriteString(w, `{"success":true,"data":{"models":`+catalog+`}}`)
 			return
 		}
 		assert.Equal(t, "fixture-relay-secret-01234567890123456789", request.Header.Get("X-Platform-Relay-Secret"))

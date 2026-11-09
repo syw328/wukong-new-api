@@ -26,7 +26,9 @@ function request(ctx) {
   const model = typeof input.model === "string" ? input.model.replace(/^platform-media:/, "") : "";
   if (!PLATFORM_MODELS.includes(model)) throw new Error("model_not_available");
   if (typeof input.authorization_max !== "number" || !Number.isFinite(input.authorization_max) || input.authorization_max <= 0 || input.authorization_max > 1000000) throw new Error("confirmed_quote_required");
-  if (typeof input.authorization_token !== "string" || input.authorization_token.length > 3000 || !input.confirmed_price_book_id) throw new Error("confirmed_quote_required");
+  // The platform signs and verifies the quote, including its length.
+  if (typeof input.authorization_token !== "string" || !input.authorization_token.trim()
+      || typeof input.confirmed_price_book_id !== "string" || !input.confirmed_price_book_id.trim()) throw new Error("confirmed_quote_required");
   return { model: model, prompt: input.prompt || "", params: input.params || {},
     ...(input.route_id !== undefined ? { route_id: input.route_id } : {}),
     ...(input.routing_preference !== undefined ? { routing_preference: input.routing_preference } : {}),
