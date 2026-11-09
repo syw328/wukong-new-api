@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -34,16 +35,45 @@ func PlatformImagesCompatibility(router http.Handler) gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		body, err := io.ReadAll(io.LimitReader(c.Request.Body, (1<<20)+1))
-		if err != nil || len(body) > 1<<20 {
-			c.AbortWithStatusJSON(413, gin.H{"error": gin.H{"code": "request_too_large", "message": "Image request exceeds 1 MiB"}})
-			return
-		}
-		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+		editing := c.Request.URL.Path == "/v1/images/edits"
 		var input map[string]any
-		if common.Unmarshal(body, &input) != nil || input == nil {
-			c.Next()
-			return
+		var form *multipart.Form
+		if editing && c.ContentType() == "multipart/form-data" {
+			var err error
+			input, form, err = readPlatformImageEditForm(c)
+			if err != nil {
+				status := http.StatusBadRequest
+				if common.IsRequestBodyTooLargeError(err) {
+					status = http.StatusRequestEntityTooLarge
+				}
+				platformImageBridge{}.fail(c, status, "invalid_request_error", "Unable to read the image edit form", "")
+				c.Abort()
+				return
+			}
+			defer form.RemoveAll()
+		} else {
+			if editing {
+				storage, err := common.GetBodyStorage(c)
+				if err != nil {
+					c.AbortWithStatusJSON(413, gin.H{"error": gin.H{"code": "request_too_large"}})
+					return
+				}
+				c.Request.Body = io.NopCloser(storage)
+				if storage.Size() > 1<<20 || c.ContentType() != "application/json" {
+					c.Next()
+					return
+				}
+			}
+			body, err := io.ReadAll(io.LimitReader(c.Request.Body, (1<<20)+1))
+			if err != nil || len(body) > 1<<20 {
+				c.AbortWithStatusJSON(413, gin.H{"error": gin.H{"code": "request_too_large", "message": "Image request exceeds 1 MiB"}})
+				return
+			}
+			c.Request.Body = io.NopCloser(bytes.NewReader(body))
+			if common.Unmarshal(body, &input) != nil || input == nil {
+				c.Next()
+				return
+			}
 		}
 		name, ok := input["model"].(string)
 		if !ok || !slices.Contains(plugin.Meta.Models, "platform-media:"+name) {
@@ -73,7 +103,18 @@ func PlatformImagesCompatibility(router http.Handler) gin.HandlerFunc {
 		}
 		c.Header("Idempotency-Key", key)
 		c.Header("Cache-Control", "private, no-store")
-		normalized, err := common.Marshal(input)
+		var edit *platformImageEdit
+		var fingerprintInput any = input
+		if editing {
+			var err error
+			edit, err = preparePlatformImageEdit(input, form)
+			if err != nil {
+				bridge.fail(c, 400, "invalid_request_error", err.Error(), "")
+				return
+			}
+			fingerprintInput = []any{"images/edits", input, edit.digests}
+		}
+		normalized, err := common.Marshal(fingerprintInput)
 		if err != nil {
 			bridge.fail(c, 400, "invalid_request_error", "Invalid image request", "")
 			return
@@ -135,6 +176,23 @@ func PlatformImagesCompatibility(router http.Handler) gin.HandlerFunc {
 				return
 			}
 			format = selectedFormat
+			if edit != nil {
+				maximum := published.Data.Models[index].referenceLimit()
+				if maximum < len(edit.urls)+len(edit.files) {
+					bridge.fail(c, 400, "invalid_request_error", "The selected model does not support this many reference images", "")
+					return
+				}
+				references := edit.urls
+				if len(edit.files) > 0 {
+					staged, err := edit.upload(c, bridge.request, key)
+					if err != nil {
+						bridge.fail(c, err.status, err.code, err.message, "")
+						return
+					}
+					references = append(references, staged...)
+				}
+				params["images"] = references
+			}
 			native := map[string]any{"model": name, "prompt": input["prompt"], "params": params}
 			if strategy, present := input["routing_preference"]; present {
 				native["routing_preference"] = strategy

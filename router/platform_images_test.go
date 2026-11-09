@@ -9,6 +9,7 @@ import (
 	"image"
 	"image/png"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -19,6 +20,8 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/controller"
+	"github.com/QuantumNous/new-api/i18n"
+	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/pkg/jsplugin"
 	"github.com/QuantumNous/new-api/plugins"
@@ -34,11 +37,14 @@ import (
 )
 
 const imageCompatibilityCatalog = `[
- {"id":"gpt-image-2","type":"image","available":true,"parameters":[{"name":"size","required":true,"options":[{"value":"auto","is_default":true},{"value":"1024x1024"}]},{"name":"quality","options":[{"value":"auto","is_default":true},{"value":"high"}]}]},
+ {"id":"gpt-image-2","type":"image","available":true,"parameters":[{"name":"size","required":true,"options":[{"value":"auto","is_default":true},{"value":"1024x1024"}]},{"name":"quality","options":[{"value":"auto","is_default":true},{"value":"high"}]},{"name":"images","max":8}]},
  {"id":"gpt-image-2-guan","type":"image","available":true,"parameters":[{"name":"size","options":[{"value":"auto","is_default":true},{"value":"1024x1024"}]},{"name":"quality","options":[{"value":"auto","is_default":true}]}]},
  {"id":"gpt-image-2.5","type":"image","available":true,"parameters":[{"name":"version","required":true,"options":[{"value":"flare","is_default":true}]},{"name":"aspect_ratio","options":[{"value":"auto","is_default":true},{"value":"1:1"},{"value":"3:2"}]},{"name":"resolution","options":[{"value":"auto","is_default":true},{"value":"1K"},{"value":"2K"},{"value":"4K"}]}]},
  {"id":"gemini-3-pro-image-preview","type":"image","available":true,"parameters":[{"name":"aspect_ratio","required":true,"options":[{"value":"auto","is_default":true},{"value":"1:1"},{"value":"3:2"}]}]},
  {"id":"gemini-3-pro-image-preview-guan","type":"image","available":true,"parameters":[{"name":"aspectRatio","required":true,"options":[{"value":"1:1","is_default":true},{"value":"3:2"}]},{"name":"imageSize","required":true,"options":[{"value":"1K","is_default":true},{"value":"2K"},{"value":"4K"}]}]},
+ {"id":"gpt-image-2.5-guan","type":"image","available":true,"parameters":[{"name":"images","max":8}]},
+ {"id":"gemini-3.1-flash-image-preview","type":"image","available":true,"parameters":[{"name":"images","max":8}]},
+ {"id":"gemini-3.1-flash-image-preview-guan","type":"image","available":true,"parameters":[{"name":"images","max":8}]},
  {"id":"doubao-seedream-5-0-260128","type":"image","available":true,"parameters":[{"name":"size","options":[{"value":"2K","is_default":true},{"value":"3K"},{"value":"4K"}]},{"name":"aspect_ratio","options":[{"value":"auto","is_default":true},{"value":"1:1"},{"value":"3:2"}]},{"name":"web_search"}]}
 ]`
 
@@ -48,6 +54,7 @@ type platformImageTest struct {
 	mu          sync.Mutex
 	submissions int
 	quotes      int
+	uploads     int
 	requests    map[string]map[string]any
 	png         []byte
 	fail        bool
@@ -58,6 +65,7 @@ type platformImageTest struct {
 func newPlatformImageTest(t *testing.T) *platformImageTest {
 	t.Helper()
 	setupRelayRouterTestDB(t)
+	require.NoError(t, i18n.Init())
 	// An optional, disposable database exercises the same HTTP/billing cases on
 	// the deployment's actual database engine. Never point this at business data.
 	if dsn := os.Getenv("PLATFORM_IMAGES_TEST_DSN"); dsn != "" {
@@ -112,6 +120,19 @@ func newPlatformImageTest(t *testing.T) *platformImageTest {
 		fixture.mu.Lock()
 		defer fixture.mu.Unlock()
 		switch {
+		case request.Method == http.MethodPost && request.URL.Path == "/v1/media/image-references":
+			fixture.uploads++
+			require.NoError(t, request.ParseMultipartForm(1<<20))
+			defer request.MultipartForm.RemoveAll()
+			require.Len(t, request.MultipartForm.File["image"], 1)
+			file, err := request.MultipartForm.File["image"][0].Open()
+			require.NoError(t, err)
+			defer file.Close()
+			raw, err := io.ReadAll(file)
+			require.NoError(t, err)
+			assert.Equal(t, fixture.png, raw)
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, `{"images":["https://images.example/uploads/fixture.png"]}`)
 		case request.URL.Path == "/v1/media/quotes":
 			fixture.quotes++
 			_, _ = io.WriteString(w, `{"authorization_max":0.4,"authorization_token":"signed-fixture-quote","confirmed_price_book_id":"fixture-book"}`)
@@ -208,6 +229,7 @@ func newPlatformImageTest(t *testing.T) *platformImageTest {
 	}
 	service.InitHttpClient()
 	engine := gin.New()
+	engine.Use(middleware.BodyStorageCleanup())
 	engine.Use(func(c *gin.Context) {
 		if c.Request.Method == http.MethodGet && strings.HasPrefix(c.Request.URL.Path, "/v1/media/generations/") {
 			if fixture.cancelRead != nil {
@@ -240,6 +262,112 @@ func (fixture *platformImageTest) generate(t *testing.T, input, key, token strin
 	body, err := io.ReadAll(response.Body)
 	require.NoError(t, err)
 	return response.StatusCode, response.Header, body
+}
+
+func TestPlatformImageModelsIncludePluginBillingAndRespectKeyScope(t *testing.T) {
+	fixture := newPlatformImageTest(t)
+	customerModels := []string{"gpt-image-2", "gpt-image-2.5", "gpt-image-2.5-guan",
+		"gemini-3-pro-image-preview", "gemini-3-pro-image-preview-guan", "gemini-3.1-flash-image-preview", "gemini-3.1-flash-image-preview-guan"}
+	require.NoError(t, model.DB.Create(&model.Token{UserId: 7, Key: "imagescustomer", Status: common.TokenStatusEnabled,
+		ExpiredTime: -1, UnlimitedQuota: true, ModelLimitsEnabled: true, ModelLimits: strings.Join(customerModels, ",")}).Error)
+	for _, item := range []struct {
+		token string
+		names []string
+	}{
+		{"imagescustomer", customerModels},
+		{"imagesrestricted", []string{"gpt-image-2.5"}},
+	} {
+		request := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+		request.Header.Set("Authorization", "Bearer "+item.token)
+		response := httptest.NewRecorder()
+		fixture.engine.ServeHTTP(response, request)
+		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+		var result struct {
+			Data []struct{ ID string } `json:"data"`
+		}
+		require.NoError(t, common.Unmarshal(response.Body.Bytes(), &result))
+		names := make([]string, 0, len(result.Data))
+		for _, row := range result.Data {
+			names = append(names, row.ID)
+		}
+		assert.ElementsMatch(t, item.names, names)
+	}
+}
+
+func (fixture *platformImageTest) edit(t *testing.T, key, token, prompt string, img []byte) *httptest.ResponseRecorder {
+	t.Helper()
+	var body bytes.Buffer
+	form := multipart.NewWriter(&body)
+	require.NoError(t, form.WriteField("model", "gpt-image-2"))
+	require.NoError(t, form.WriteField("prompt", prompt))
+	require.NoError(t, form.WriteField("n", "1"))
+	file, err := form.CreateFormFile("image[]", "ref.png")
+	require.NoError(t, err)
+	_, err = file.Write(img)
+	require.NoError(t, err)
+	require.NoError(t, form.Close())
+	request := httptest.NewRequest(http.MethodPost, "/v1/images/edits", &body)
+	request.Header.Set("Content-Type", form.FormDataContentType())
+	request.Header.Set("Authorization", "Bearer "+token)
+	request.Header.Set("Idempotency-Key", key)
+	response := httptest.NewRecorder()
+	fixture.engine.ServeHTTP(response, request)
+	return response
+}
+
+func TestPlatformImageEditStagesReferenceAndSettlesOnce(t *testing.T) {
+	fixture := newPlatformImageTest(t)
+	first := fixture.edit(t, "fixture-edit-1", "imagesalice", "Make the square blue", fixture.png)
+	require.Equal(t, http.StatusOK, first.Code, first.Body.String())
+	var response struct {
+		Data []struct {
+			Base64 string `json:"b64_json"`
+		} `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(first.Body.Bytes(), &response))
+	require.Len(t, response.Data, 1)
+	assert.Equal(t, base64.StdEncoding.EncodeToString(fixture.png), response.Data[0].Base64)
+	assert.NotEmpty(t, first.Header().Get("X-Task-Id"))
+	retry := fixture.edit(t, "fixture-edit-1", "imagesalice", "Make the square blue", fixture.png)
+	require.Equal(t, http.StatusOK, retry.Code, retry.Body.String())
+	assert.Equal(t, "true", retry.Header().Get("Idempotent-Replayed"))
+	assert.Equal(t, first.Header().Get("X-Task-Id"), retry.Header().Get("X-Task-Id"))
+	changedFile := append(bytes.Clone(fixture.png), 0)
+	changed := fixture.edit(t, "fixture-edit-1", "imagesalice", "Make the square blue", changedFile)
+	assert.Equal(t, http.StatusConflict, changed.Code, changed.Body.String())
+	conflict := fixture.edit(t, "fixture-edit-1", "imagesalice", "Make the square green", fixture.png)
+	assert.Equal(t, http.StatusConflict, conflict.Code, conflict.Body.String())
+	forbidden := fixture.edit(t, "fixture-edit-2", "imagesrestricted", "Make the square blue", fixture.png)
+	assert.Equal(t, http.StatusForbidden, forbidden.Code, forbidden.Body.String())
+	assert.Equal(t, 1, fixture.submissions)
+	assert.Equal(t, 1, fixture.quotes)
+	assert.Equal(t, 1, fixture.uploads)
+	assert.Equal(t, []any{"https://images.example/uploads/fixture.png"}, fixture.requests["gpt-image-2"]["params"].(map[string]any)["images"])
+	var user model.User
+	require.NoError(t, model.DB.First(&user, 7).Error)
+	assert.Equal(t, 5_000_000, user.Quota)
+	assert.Equal(t, 60_000, user.UsedQuota)
+}
+
+func TestPlatformImageEditAcceptsReferenceURLs(t *testing.T) {
+	fixture := newPlatformImageTest(t)
+	edit := func(input string) *httptest.ResponseRecorder {
+		request := httptest.NewRequest(http.MethodPost, "/v1/images/edits", strings.NewReader(input))
+		request.Header.Set("Authorization", "Bearer imagesalice")
+		request.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		fixture.engine.ServeHTTP(response, request)
+		return response
+	}
+	masked := edit(`{"model":"gpt-image-2","prompt":"edit","images":[{"image_url":"https://example.com/ref.png"}],"mask":{"image_url":"https://example.com/mask.png"}}`)
+	require.Equal(t, http.StatusBadRequest, masked.Code, masked.Body.String())
+	empty := edit(`{"model":"gpt-image-2","prompt":"edit"}`)
+	require.Equal(t, http.StatusBadRequest, empty.Code, empty.Body.String())
+	edited := edit(`{"model":"gpt-image-2","prompt":"edit","images":[{"image_url":"https://example.com/ref.png"}]}`)
+	require.Equal(t, http.StatusOK, edited.Code, edited.Body.String())
+	assert.Equal(t, 0, fixture.uploads)
+	assert.Equal(t, 1, fixture.submissions)
+	assert.Equal(t, []any{"https://example.com/ref.png"}, fixture.requests["gpt-image-2"]["params"].(map[string]any)["images"])
 }
 
 func TestPlatformImagesCompatibilityGeneratesSixModelsAndSettlesOnce(t *testing.T) {

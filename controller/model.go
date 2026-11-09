@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -239,6 +240,7 @@ func ListModels(c *gin.Context, modelType int) {
 	ownerGroups := groups.ownerGroups
 	modelLimitEnable := common.GetContextKeyBool(c, constant.ContextKeyTokenModelLimitEnabled)
 	var tokenModelLimit map[string]bool
+	var needsTaskPrice []string
 	if modelLimitEnable {
 		s, ok := common.GetContextKey(c, constant.ContextKeyTokenModelLimit)
 		if ok {
@@ -257,9 +259,20 @@ func ListModels(c *gin.Context, modelType int) {
 			}
 		}
 		if !acceptUnsetRatioModel && !helper.HasModelBillingConfig(modelName) {
-			continue
+			needsTaskPrice = append(needsTaskPrice, modelName)
 		}
 		userModelNames = append(userModelNames, modelName)
+	}
+	if len(needsTaskPrice) > 0 {
+		priced, err := model.GetPricedTaskPluginModels(needsTaskPrice, ownerGroups)
+		if err != nil {
+			common.SysLog(fmt.Sprintf("GetPricedTaskPluginModels error: %v", err))
+		}
+		missing := make(map[string]bool, len(needsTaskPrice))
+		for _, name := range needsTaskPrice {
+			missing[name] = !priced[name]
+		}
+		userModelNames = slices.DeleteFunc(userModelNames, func(name string) bool { return missing[name] })
 	}
 
 	ownerByModel := map[string]string{}

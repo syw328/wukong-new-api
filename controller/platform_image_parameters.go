@@ -16,6 +16,7 @@ type platformImageModel struct {
 	Parameters []struct {
 		Name     string `json:"name"`
 		Required bool   `json:"required"`
+		Max      int    `json:"max"`
 		Options  []struct {
 			Value     string `json:"value"`
 			IsDefault bool   `json:"is_default"`
@@ -141,4 +142,16 @@ func platformImageParameters(input map[string]any, model platformImageModel) (ma
 		}
 	}
 	return params, format, nil
+}
+
+func (model platformImageModel) referenceLimit() int {
+	for _, field := range model.Parameters {
+		if field.Name == "images" {
+			if field.Max > 0 {
+				return min(field.Max, platformImageEditMaxReferences)
+			}
+			return platformImageEditMaxReferences
+		}
+	}
+	return 0
 }

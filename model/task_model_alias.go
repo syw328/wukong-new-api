@@ -2,12 +2,16 @@ package model
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/pkg/jsplugin"
+	"github.com/QuantumNous/new-api/setting/billing_setting"
 )
 
 // TaskAliasTarget is one mapping-derived alias after cross-channel aggregation.
@@ -209,4 +213,48 @@ func followChannelModelMapping(modelMap map[string]string, start string) (string
 		visited[mapped] = true
 		current = mapped
 	}
+}
+
+// GetPricedTaskPluginModels uses the selected groups' live channel mappings.
+// A price for a disabled or unrelated plugin must not expose a model.
+func GetPricedTaskPluginModels(names, groups []string) (map[string]bool, error) {
+	priced := make(map[string]bool)
+	if len(names) == 0 || len(groups) == 0 {
+		return priced, nil
+	}
+	generation := jsplugin.DefaultRegistry.Generation()
+	var rows []struct {
+		Model string
+		Channel
+	}
+	err := DB.Table("abilities").
+		Select("abilities.model, channels.setting, channels.model_mapping").
+		Joins("JOIN channels ON channels.id = abilities.channel_id").
+		Where("abilities."+commonGroupCol+" IN ? AND abilities.model IN ? AND abilities.enabled = ?", groups, names, true).
+		Where("channels.type = ? AND channels.status = ?", constant.ChannelTypeTaskPlugin, common.ChannelStatusEnabled).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		if priced[row.Model] {
+			continue
+		}
+		key := row.GetSetting().TaskPluginKey
+		plugin, ok := generation.Get(key)
+		if !ok {
+			continue
+		}
+		var mapping map[string]string
+		if raw := row.GetModelMapping(); raw != "" && common.UnmarshalJsonStr(raw, &mapping) != nil {
+			continue
+		}
+		target, cycle := followChannelModelMapping(mapping, row.Model)
+		if cycle || !slices.Contains(plugin.Meta.Models, target) {
+			continue
+		}
+		expr, ok := billing_setting.ResolveTaskBillingExpr(key, row.Model, target)
+		priced[row.Model] = ok && strings.TrimSpace(expr) != ""
+	}
+	return priced, nil
 }

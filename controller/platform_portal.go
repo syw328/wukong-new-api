@@ -4,6 +4,7 @@ package controller
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -80,13 +81,8 @@ func proxyPlatformPortal(c *gin.Context, path string, accountPrice bool, mediaQu
 			return
 		}
 		request.Header.Set(service.PlatformKeyContextHeader, policy)
-		gateway, readErr := model.GetChannelById(1, true)
-		if readErr != nil || gateway == nil || gateway.Status != 1 {
-			c.JSON(503, gin.H{"success": false, "message": "Platform gateway is not ready"})
-			return
-		}
-		key, _, keyErr := gateway.GetNextEnabledKey()
-		if keyErr != nil || key == "" {
+		key, err := platformPortalServiceKey()
+		if err != nil {
 			c.JSON(503, gin.H{"success": false, "message": "Platform gateway is not ready"})
 			return
 		}
@@ -143,4 +139,16 @@ func PostPlatformRecharge(c *gin.Context) {
 }
 func GetPlatformRecharge(c *gin.Context) {
 	proxyPlatformPortal(c, "/api/developer/relay-recharge/orders/"+url.PathEscape(c.Param("order_id")), true, false)
+}
+
+func platformPortalServiceKey() (string, error) {
+	gateway, err := model.GetChannelById(1, true)
+	if err != nil || gateway == nil || gateway.Status != common.ChannelStatusEnabled {
+		return "", errors.New("platform gateway is not ready")
+	}
+	key, _, keyErr := gateway.GetNextEnabledKey()
+	if keyErr != nil || key == "" {
+		return "", errors.New("platform gateway is not ready")
+	}
+	return key, nil
 }

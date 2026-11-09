@@ -77,9 +77,11 @@ func SetRelayRouter(router *gin.Engine) {
 	relayV1Router.Use(middleware.ModelRequestRateLimit())
 	// Platform images reuse the native task pipeline before the synchronous
 	// distributor filters out its asynchronous platform-media channel.
-	relayV1Router.POST("/images/generations", controller.PlatformImagesCompatibility(router), middleware.Distribute(), func(c *gin.Context) {
-		controller.Relay(c, types.RelayFormatOpenAIImage)
-	})
+	for _, path := range []string{"/images/generations", "/images/edits"} {
+		relayV1Router.POST(path, controller.PlatformImagesCompatibility(router), middleware.Distribute(), func(c *gin.Context) {
+			controller.Relay(c, types.RelayFormatOpenAIImage)
+		})
+	}
 	{
 		// WebSocket 路由（统一到 Relay）
 		wsRouter := relayV1Router.Group("")
@@ -120,9 +122,6 @@ func SetRelayRouter(router *gin.Engine) {
 
 		// image related routes
 		httpRouter.POST("/edits", func(c *gin.Context) {
-			controller.Relay(c, types.RelayFormatOpenAIImage)
-		})
-		httpRouter.POST("/images/edits", func(c *gin.Context) {
 			controller.Relay(c, types.RelayFormatOpenAIImage)
 		})
 
