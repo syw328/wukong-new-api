@@ -197,7 +197,7 @@ it('recharge documentation copies create and query examples for the current gate
   const create = await navigator.clipboard.readText()
   expect(create).toContain('/v1/recharge/orders')
   expect(create).toContain('Idempotency-Key: recharge-order-001')
-  expect(create).toContain('"amount":"12.34"')
+  expect(create).toContain('"amount":"10.00"')
   await user.click(screen.getByRole('button', { name: 'Copy recharge query' }))
   expect(await navigator.clipboard.readText()).toContain('/v1/recharge/orders/$ORDER_ID')
   expect(screen.getByText(/"qr_code_image":/)).toBeVisible()

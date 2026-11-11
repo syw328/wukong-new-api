@@ -23,18 +23,18 @@ export const balanceResponse = {
   },
 }
 export const rechargeGuidance =
-  'Create a payment QR with POST /recharge/orders using this API key and a unique Idempotency-Key. amount is a CNY string from 1 to 5000 with at most two decimals; payment_method is wechat or alipay. The key owner receives 1 credit per yuan; bonuses are separate. No user ID, browser login or model is needed. Display qr_code_image (a PNG data URL), or encode qr_code as a QR locally. Only trust the server status, never a client payment-success message.'
+  'Create a payment QR with POST /recharge/orders using this API key and a unique Idempotency-Key. amount is a CNY string and must be one of the site’s top-up amounts (the same ones the top-up page shows); any other amount returns 400 payment_amount_unavailable with allowed_amounts listing the current choices. payment_method is wechat or alipay. The key owner receives 1 credit per yuan; bonuses are separate. No user ID, browser login or model is needed. Display qr_code_image (a PNG data URL), or encode qr_code as a QR locally. Only trust the server status, never a client payment-success message.'
 export const rechargeRecovery =
   'Poll GET /recharge/orders/{id} every 5 seconds. paid with credited_at confirms settlement; then GET /balance reads the wallet. Stop normal polling on paid, failed, expired, refunded or partially_refunded. Refund amounts are CNY; credited_points, bonus_points and debt_repaid are credits. On timeout or 5xx, query the original order or retry the same body and Idempotency-Key; never create a second payment blindly. An expired QR cannot be reused; check the original order before starting a new payment. Foreign orders return 404. This API recharges the account wallet, not the API key spending quota.'
 export function rechargeRequest(base: string): string {
-  return `curl --fail-with-body "${base}/recharge/orders" \\\n  -H "Authorization: Bearer $PLATFORM_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -H "Idempotency-Key: recharge-order-001" \\\n  -d '{"amount":"12.34","payment_method":"wechat"}'`
+  return `curl --fail-with-body "${base}/recharge/orders" \\\n  -H "Authorization: Bearer $PLATFORM_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -H "Idempotency-Key: recharge-order-001" \\\n  -d '{"amount":"10.00","payment_method":"wechat"}'`
 }
 export function rechargeQuery(base: string): string {
   return `curl --fail-with-body "${base}/recharge/orders/$ORDER_ID" \\\n  -H "Authorization: Bearer $PLATFORM_API_KEY"`
 }
 export const rechargeResponse = {
   success: true,
-  data: { id: 'LK_EXAMPLE_ORDER', status: 'pending', amount: '12.34', currency: 'CNY', points: 12.34,
+  data: { id: 'LK_EXAMPLE_ORDER', status: 'pending', amount: '10.00', currency: 'CNY', points: 10,
     credited_points: 0, bonus_points: 0, debt_repaid: 0, refunded_amount: '0.00', payment_method: 'wechat',
     qr_code: 'weixin://example', qr_code_image: 'data:image/png;base64,...', credited_at: null, poll_after_seconds: 5 },
 }
