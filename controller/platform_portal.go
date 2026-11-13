@@ -1,5 +1,5 @@
 // Copyright (C) 2026 QuantumNous and contributors. Licensed under AGPL-3.0-or-later.
-// Modified for tenant-scoped catalog, account prices and media quotes.
+// Modified for tenant-scoped catalog, account prices, media quotes and platform JSON relays.
 package controller
 
 import (
@@ -94,11 +94,19 @@ func proxyPlatformPortal(c *gin.Context, path string, accountPrice bool, mediaQu
 		return
 	}
 	defer response.Body.Close()
+	if !copyPlatformJSONResponse(c, response) {
+		c.JSON(503, gin.H{"success": false, "message": "Invalid platform response"})
+	}
+}
+
+// copyPlatformJSONResponse relays a bounded JSON object with the platform's
+// status and rate-limit headers. A redirect or non-JSON body is refused so a
+// misrouted origin can neither send the caller elsewhere nor leak a page.
+func copyPlatformJSONResponse(c *gin.Context, response *http.Response) bool {
 	data, err := io.ReadAll(io.LimitReader(response.Body, (8<<20)+1))
 	var payload map[string]any
 	if err != nil || len(data) > 8<<20 || common.Unmarshal(data, &payload) != nil || response.StatusCode >= 300 && response.StatusCode < 400 {
-		c.JSON(503, gin.H{"success": false, "message": "Invalid platform response"})
-		return
+		return false
 	}
 	for _, name := range []string{"Retry-After", "RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset"} {
 		if value := response.Header.Get(name); value != "" {
@@ -108,6 +116,7 @@ func proxyPlatformPortal(c *gin.Context, path string, accountPrice bool, mediaQu
 	c.Header("Cache-Control", "private, no-store")
 	c.Header("Vary", "Cookie, Authorization, Host")
 	c.Data(response.StatusCode, "application/json; charset=utf-8", data)
+	return true
 }
 
 func GetPlatformCatalog(c *gin.Context) {

@@ -202,3 +202,49 @@ it('recharge documentation copies create and query examples for the current gate
   expect(await navigator.clipboard.readText()).toContain('/v1/recharge/orders/$ORDER_ID')
   expect(screen.getByText(/"qr_code_image":/)).toBeVisible()
 })
+
+it('upload and voice cloning guides copy portal requests with the fields the platform requires', async () => {
+  const user = userEvent.setup()
+  const runtime = document.createElement('script')
+  runtime.id = 'platform-portal-runtime'
+  runtime.type = 'application/json'
+  runtime.textContent = JSON.stringify({
+    origin: window.location.origin,
+    basePath: '/api',
+    transportPath: '/api/open-platform',
+  })
+  document.body.append(runtime)
+  setup()
+  const base = `${window.location.origin}/api/open-platform/v1`
+  const uploads = screen.getByRole('region', { name: 'Upload reference media' })
+  expect(within(uploads).getByText(`${base}/uploads/videos`)).toBeVisible()
+  await user.click(
+    within(uploads).getByRole('button', { name: 'Copy upload request' })
+  )
+  const upload = await navigator.clipboard.readText()
+  expect(upload).toContain(`${base}/uploads/images`)
+  expect(upload).toContain('-F "image=@./first-frame.png"')
+  expect(upload).toContain('-F "video=@./reference.mp4"')
+  const voices = screen.getByRole('region', { name: 'Voice cloning' })
+  expect(
+    within(voices).getByText(`${base}/voices/{asset_id}/activation/quote`)
+  ).toBeVisible()
+  await user.click(
+    within(voices).getByRole('button', { name: 'Copy voice cloning request' })
+  )
+  const clone = await navigator.clipboard.readText()
+  expect(clone).toContain(`${base}/upload`)
+  expect(clone).toContain(`${base}/voices/clone`)
+  expect(clone).toContain('Idempotency-Key: voice-clone-001')
+  expect(clone).toContain('"upload_id":"REPLACE_WITH_FILES_0_ID"')
+})
+
+it('a model document keeps the upload and voice cloning guides on the quick start', () => {
+  setup('video/one')
+  expect(
+    screen.queryByRole('region', { name: 'Upload reference media' })
+  ).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('region', { name: 'Voice cloning' })
+  ).not.toBeInTheDocument()
+})

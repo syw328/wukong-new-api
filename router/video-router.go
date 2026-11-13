@@ -1,3 +1,5 @@
+// Copyright (C) 2026 QuantumNous and contributors. Licensed under AGPL-3.0-or-later.
+// Modified to send platform media models to their quote-bound native API.
 package router
 
 import (
@@ -15,6 +17,7 @@ func SetVideoRouter(router *gin.Engine) {
 	videoSharedRouter.POST(
 		"/video/generations",
 		middleware.PinTaskPluginEndpoint(),
+		middleware.PlatformMediaNativeEndpoint(),
 		middleware.TaskPluginEndpointOnly(middleware.ModelRequestRateLimit()),
 		middleware.PrepareTaskPluginEndpoint(),
 		middleware.Distribute(),

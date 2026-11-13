@@ -13,6 +13,7 @@ import {
 import type { PlatformModel } from '@/features/platform-models/types'
 import { portalApiOrigin } from '@/lib/portal-runtime'
 
+import { NativeReference } from './native-reference'
 import {
   rechargeGuidance, rechargeRecovery, rechargeRequest, rechargeQuery, rechargeResponse,
   balanceGuidance,
@@ -89,6 +90,7 @@ export function ProtocolReference(props: { model?: PlatformModel }) {
         ))}
         <pre className='bg-muted/20 overflow-auto rounded-xl border p-4 text-xs leading-6'><code>{JSON.stringify(rechargeResponse, null, 2)}</code></pre>
       </section>
+      {!props.model && <NativeReference />}
       {!props.model && (
         <section className='space-y-4'>
           <h2 className='text-xl font-semibold'>

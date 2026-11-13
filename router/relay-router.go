@@ -1,3 +1,5 @@
+// Copyright (C) 2026 QuantumNous and contributors. Licensed under AGPL-3.0-or-later.
+// Modified for platform quotes, balance, recharge, uploads and voice cloning.
 package router
 
 import (
@@ -12,6 +14,11 @@ import (
 
 func SetRelayRouter(router *gin.Engine) {
 	router.POST("/v1/media/quotes", middleware.RouteTag("relay"), middleware.TokenAuth(), middleware.ModelRequestRateLimit(), controller.PostPlatformMediaQuote)
+	// Uploads stream to the platform under its own ceilings, ahead of the
+	// decompressing body limit registered below.
+	for _, path := range []string{"/v1/upload", "/v1/uploads/images", "/v1/uploads/videos"} {
+		router.POST(path, middleware.RouteTag("relay"), middleware.CORS(), middleware.TokenAuth(), controller.PostPlatformUpload)
+	}
 	router.Use(middleware.CORS())
 	router.Use(middleware.DecompressRequestMiddleware())
 	router.Use(middleware.BodyStorageCleanup()) // 清理请求体存储
@@ -19,6 +26,13 @@ func SetRelayRouter(router *gin.Engine) {
 	router.POST("/v1/recharge/orders", middleware.RouteTag("relay"), middleware.TokenAuth(), controller.PostPlatformRecharge)
 	router.GET("/v1/recharge/orders/:order_id", middleware.RouteTag("relay"), middleware.TokenAuth(), controller.GetPlatformRecharge)
 	router.GET("/v1/balance", middleware.RouteTag("relay"), middleware.TokenAuth(), controller.GetPlatformBalance)
+	voiceRouter := router.Group("/v1/voices", middleware.RouteTag("relay"), middleware.TokenAuth())
+	voiceRouter.GET("", controller.PlatformVoice)
+	voiceRouter.POST("/clone", controller.PlatformVoice)
+	voiceRouter.GET("/:voice_id", controller.PlatformVoice)
+	voiceRouter.GET("/:voice_id/activation/quote", controller.PlatformVoice)
+	voiceRouter.GET("/:voice_id/activation", controller.PlatformVoice)
+	voiceRouter.POST("/:voice_id/activation", controller.PlatformVoice)
 	// https://platform.openai.com/docs/api-reference/introduction
 	modelsRouter := router.Group("/v1/models")
 	modelsRouter.Use(middleware.RouteTag("relay"))

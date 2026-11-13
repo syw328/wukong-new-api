@@ -38,6 +38,63 @@ export const rechargeResponse = {
     credited_points: 0, bonus_points: 0, debt_repaid: 0, refunded_amount: '0.00', payment_method: 'wechat',
     qr_code: 'weixin://example', qr_code_image: 'data:image/png;base64,...', credited_at: null, poll_after_seconds: 5 },
 }
+// Platform-native uploads and voice cloning (server/public-api/publicVoiceRoutes.js,
+// publicApiRoutes.js /uploads/*); limits follow the platform, not this portal.
+export const uploadGuidance =
+  'Upload local files with the same API key before using them in a request. Uploads are free and need no Idempotency-Key. Send multipart/form-data with a Content-Length header. Uploaded files belong to the key owner; other accounts cannot use them.'
+export const uploadEndpoints: Row[] = [
+  ['POST', '/uploads/images', 'File field image: one PNG, JPG or WebP image up to 2 MB. Returns a url valid for 24 hours.'],
+  ['POST', '/uploads/videos', 'File field video: one MP4 or MOV video up to 50 MB. Returns a url valid for 24 hours.'],
+  ['POST', '/upload', 'File field files: up to 10 images, videos or audio files, 100 MB each and 110 MB per request. Returns files[].id and needs a positive balance.'],
+]
+export const uploadUsage =
+  'Put the returned url into the media request params, for example params.images or params.videos. Public HTTPS links can be used directly without uploading. An oversized request returns 413.'
+export function uploadRequest(base: string): string {
+  return `curl --fail-with-body "${base}/uploads/images" \\\n  -H "Authorization: Bearer $PLATFORM_API_KEY" \\\n  -F "image=@./first-frame.png"\n\ncurl --fail-with-body "${base}/uploads/videos" \\\n  -H "Authorization: Bearer $PLATFORM_API_KEY" \\\n  -F "video=@./reference.mp4"`
+}
+export const uploadResponse = {
+  id: 'file_example',
+  object: 'file',
+  purpose: 'video_reference',
+  filename: 'first-frame.png',
+  bytes: 456789,
+  mime_type: 'image/png',
+  url: 'https://example.com/uploads/public-api-reference-example.png',
+  expires_at: '2026-11-02T12:00:00.000Z',
+}
+export const voiceGuidance =
+  'Clone a speech-2.8 voice with the same API key. Upload a 10–60 second recording (mp3, wav or flac; m4a, aac and ogg are converted) with POST /upload, then create the voice with files[0].id as upload_id. The key must allow speech-2.8 and must not use custom routes. Cloning and activation are charged, and each needs its own new Idempotency-Key.'
+export const voiceEndpoints: Row[] = [
+  ['POST', '/upload', 'Upload the recording'],
+  ['POST', '/voices/clone', 'Create the voice and submit it for review'],
+  ['GET', '/voices?model=speech-2.8', 'List your voices and review status'],
+  ['GET', '/voices/{asset_id}', 'Read one voice'],
+  ['GET', '/voices/{asset_id}/activation/quote', 'Quote the one-time activation'],
+  ['POST', '/voices/{asset_id}/activation', 'Confirm the activation with the quote'],
+  ['GET', '/voices/{asset_id}/activation', 'Query the original activation'],
+]
+export const voiceReview =
+  'Poll GET /voices/{asset_id} every 5–10 seconds. Use asset.voice_id in speech-2.8 requests only when review_status is approved and usable is true; review_note explains a rejection. An approved voice with can_activate true needs a one-time activation: read the quote, confirm authorization_max, then send authorization_token and authorization_max unchanged.'
+export const voiceRecovery =
+  'After 202, poll GET /voices/{asset_id}/activation until activation.status is completed; failed releases the hold, and unknown keeps the authorization for reconciliation. After a timeout, repeat the same request with the same Idempotency-Key or query the original voice; never clone, activate or pay again with a new key.'
+export function voiceRequest(base: string): string {
+  return [
+    `curl --fail-with-body "${base}/upload" \\\n  -H "Authorization: Bearer $PLATFORM_API_KEY" \\\n  -F "files=@./sample.wav"`,
+    `curl --fail-with-body "${base}/voices/clone" \\\n  -H "Authorization: Bearer $PLATFORM_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -H "Idempotency-Key: voice-clone-001" \\\n  -d '{"name":"My voice","upload_id":"REPLACE_WITH_FILES_0_ID"}'`,
+    `curl --fail-with-body "${base}/voices/$ASSET_ID" \\\n  -H "Authorization: Bearer $PLATFORM_API_KEY"`,
+  ].join('\n\n')
+}
+export const voiceResponse = {
+  asset: {
+    id: 'ASSET_ID',
+    voice_id: 'VOICE_ID',
+    review_status: 'pending',
+    usable: false,
+    can_activate: false,
+    activation_required: true,
+  },
+  cost: 1,
+}
 export function protocolEndpoints(model: PlatformModel): Row[] {
   if (model.type === 'chat') {
     return [

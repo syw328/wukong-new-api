@@ -1,4 +1,5 @@
-// Copyright (C) 2026 QuantumNous and contributors. AGPL-3.0-or-later.
+// Copyright (C) 2026 QuantumNous and contributors. Licensed under AGPL-3.0-or-later.
+// Modified for platform media idempotency and its native-endpoint guard.
 package middleware
 
 import (
@@ -9,11 +10,13 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/pkg/jsplugin"
 	"github.com/gin-gonic/gin"
 )
 
@@ -130,5 +133,42 @@ func PlatformMediaIdempotency() gin.HandlerFunc {
 		c.Set("platform_media_public_task_id", taskID)
 		c.Set("platform_media_request_fingerprint", fingerprint)
 		c.Next()
+	}
+}
+
+// PlatformMediaNativeEndpoint points platform models at their quote-bound API.
+// The generic video endpoint parses a fixed task schema without the confirmed
+// quote, and its channel filter never selects the platform-media channel, so
+// such a request would otherwise fail as an unavailable model.
+func PlatformMediaNativeEndpoint() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		generation := jsplugin.DefaultRegistry.Generation()
+		if _, pinned := c.Get(jsplugin.ContextKeyPinnedEndpoint); pinned || generation == nil {
+			c.Next()
+			return
+		}
+		modelRequest, err := getModelFromRequest(c)
+		if err != nil || strings.TrimSpace(modelRequest.Model) == "" {
+			c.Next()
+			return
+		}
+		owned := false
+		if declared, ok := generation.CanonicalModel(modelRequest.Model); ok {
+			owned = slices.ContainsFunc(generation.PluginsByModel(declared), func(plugin *jsplugin.LoadedPlugin) bool {
+				return plugin.Meta.Key == "platform-media"
+			})
+		} else if target, ok := model.ResolveTaskModelAlias(generation, modelRequest.Model); ok {
+			owned = target.PluginKey == "platform-media"
+		}
+		if !owned {
+			c.Next()
+			return
+		}
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": gin.H{
+			"code": "platform_media_endpoint_required",
+			"type": "invalid_request_error",
+			"message": "This model uses the platform media API: request a quote with POST /v1/media/quotes, " +
+				"then create the task with POST /v1/media/generations using that quote and an Idempotency-Key",
+		}})
 	}
 }

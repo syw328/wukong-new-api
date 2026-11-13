@@ -45,7 +45,8 @@ const imageCompatibilityCatalog = `[
  {"id":"gpt-image-2.5-guan","type":"image","available":true,"parameters":[{"name":"images","max":8}]},
  {"id":"gemini-3.1-flash-image-preview","type":"image","available":true,"parameters":[{"name":"images","max":8}]},
  {"id":"gemini-3.1-flash-image-preview-guan","type":"image","available":true,"parameters":[{"name":"images","max":8}]},
- {"id":"doubao-seedream-5-0-260128","type":"image","available":true,"parameters":[{"name":"size","options":[{"value":"2K","is_default":true},{"value":"3K"},{"value":"4K"}]},{"name":"aspect_ratio","options":[{"value":"auto","is_default":true},{"value":"1:1"},{"value":"3:2"}]},{"name":"web_search"}]}
+ {"id":"doubao-seedream-5-0-260128","type":"image","available":true,"parameters":[{"name":"size","options":[{"value":"2K","is_default":true},{"value":"3K"},{"value":"4K"}]},{"name":"aspect_ratio","options":[{"value":"auto","is_default":true},{"value":"1:1"},{"value":"3:2"}]},{"name":"web_search"}]},
+ {"id":"kling-v3-video","type":"video","available":true,"parameters":[{"name":"duration","options":[{"value":5,"is_default":true}]}]}
 ]`
 
 type platformImageTest struct {
@@ -244,6 +245,7 @@ func newPlatformImageTest(t *testing.T) *platformImageTest {
 	})
 	engine.GET("/api/platform-catalog", controller.GetPlatformCatalog)
 	SetRelayRouter(engine)
+	SetVideoRouter(engine)
 	SetTaskRouter(engine)
 	engine.NoRoute(SetPluginRouter(engine), func(c *gin.Context) { c.Status(http.StatusNotFound) })
 	fixture.server = httptest.NewServer(engine)
@@ -511,4 +513,32 @@ func TestPlatformImagesCompatibilityResumesAfterInterruptedWait(t *testing.T) {
 	require.NoError(t, model.DB.First(&user, 7).Error)
 	assert.Equal(t, 5_000_000, user.Quota)
 	assert.Equal(t, 60_000, user.UsedQuota)
+}
+
+// The OpenAI-style video endpoint parses a fixed task schema that has no quote
+// fields, so a platform model must be sent to the native quote/create pair
+// instead of failing later with a misleading "confirmed quote required".
+func TestPlatformMediaVideoGenerationsPointsToNativeMediaAPI(t *testing.T) {
+	fixture := newPlatformImageTest(t)
+	input := `{"model":"kling-v3-video","prompt":"A red square","authorization_max":0.4,` +
+		`"authorization_token":"signed-fixture-quote","confirmed_price_book_id":"fixture-book"}`
+	request := httptest.NewRequest(http.MethodPost, "/v1/video/generations", strings.NewReader(input))
+	request.Header.Set("Authorization", "Bearer imagesalice")
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Idempotency-Key", "fixture-video-order")
+	response := httptest.NewRecorder()
+	fixture.engine.ServeHTTP(response, request)
+	require.Equal(t, http.StatusBadRequest, response.Code, response.Body.String())
+	assert.Contains(t, response.Body.String(), "platform_media_endpoint_required")
+	assert.Contains(t, response.Body.String(), "POST /v1/media/quotes")
+	assert.Contains(t, response.Body.String(), "POST /v1/media/generations")
+	assert.Equal(t, 0, fixture.quotes)
+	assert.Equal(t, 0, fixture.submissions)
+	var tasks int64
+	require.NoError(t, model.DB.Model(&model.Task{}).Count(&tasks).Error)
+	assert.Zero(t, tasks)
+	var user model.User
+	require.NoError(t, model.DB.First(&user, 7).Error)
+	assert.Equal(t, 5_000_000, user.Quota)
+	assert.Zero(t, user.UsedQuota)
 }
