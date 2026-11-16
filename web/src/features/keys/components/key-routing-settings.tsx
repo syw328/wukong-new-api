@@ -64,7 +64,7 @@ export function RoutingAdvanced(props: {
         </Label>
         <p className='text-muted-foreground text-xs'>
           {t(
-            'Native Responses and legacy media protocols require this permission and do not switch routes. Native media uses the key strategy.'
+            'Codex uses an eligible route without this permission. Enable it to accept an explicit route ID or legacy media requests.'
           )}
         </p>
       </CollapsibleContent>
