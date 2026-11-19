@@ -467,6 +467,55 @@ func TestPlatformImagesCompatibilityRefundsConfirmedFailure(t *testing.T) {
 	assert.Equal(t, 1, fixture.submissions)
 }
 
+func TestPlatformMediaTaskReturnsSettledCharge(t *testing.T) {
+	fixture := newPlatformImageTest(t)
+	const endpoint = "/v1/media/generations"
+	call := func(method, path, token, key, body string) *httptest.ResponseRecorder {
+		request := httptest.NewRequest(method, path, strings.NewReader(body))
+		request.Header.Set("Authorization", "Bearer "+token)
+		if method == http.MethodPost {
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("Idempotency-Key", key)
+		}
+		response := httptest.NewRecorder()
+		fixture.engine.ServeHTTP(response, request)
+		return response
+	}
+	readTask := func(t *testing.T, response *httptest.ResponseRecorder, status, billingState string, charged any) string {
+		t.Helper()
+		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+		var task struct {
+			ID      string         `json:"id"`
+			Status  string         `json:"status"`
+			Billing map[string]any `json:"billing"`
+		}
+		require.NoError(t, common.Unmarshal(response.Body.Bytes(), &task))
+		assert.NotEmpty(t, task.ID)
+		assert.Equal(t, status, task.Status)
+		assert.Equal(t, map[string]any{"currency": "CREDITS", "state": billingState, "charged": charged}, task.Billing)
+		return task.ID
+	}
+	const body = `{"model":"gpt-image-2","prompt":"fixture","authorization_max":0.4,"authorization_token":"signed-fixture-quote","confirmed_price_book_id":"fixture-book"}`
+	t.Run("successful task reports exact charge on repeated reads", func(t *testing.T) {
+		id := readTask(t, call(http.MethodPost, endpoint, "imagesalice", "fixture-native-success", body), "processing", "pending", nil)
+		for range 2 {
+			assert.Equal(t, id, readTask(t, call(http.MethodGet, endpoint+"/"+id, "imagesalice", "", ""), "completed", "settled", .12))
+		}
+		other := call(http.MethodGet, endpoint+"/"+id, "imagesbob", "", "")
+		assert.Equal(t, http.StatusNotFound, other.Code, other.Body.String())
+		assert.NotContains(t, other.Body.String(), `"charged"`)
+	})
+	t.Run("confirmed failure reports zero charge", func(t *testing.T) {
+		fixture.fail = true
+		id := readTask(t, call(http.MethodPost, endpoint, "imagesalice", "fixture-native-failed", body), "processing", "pending", nil)
+		assert.Equal(t, id, readTask(t, call(http.MethodGet, endpoint+"/"+id, "imagesalice", "", ""), "failed", "settled", 0.0))
+	})
+	assert.Equal(t, 2, fixture.submissions)
+	var user model.User
+	require.NoError(t, model.DB.First(&user, 7).Error)
+	assert.Equal(t, 60_000, user.UsedQuota)
+}
+
 func TestPlatformImagesCompatibilityCountsOnePublicRequestForRateLimits(t *testing.T) {
 	fixture := newPlatformImageTest(t)
 	previousEnabled, previousCount, previousSuccess := setting.ModelRequestRateLimitEnabled, setting.ModelRequestRateLimitCount, setting.ModelRequestRateLimitSuccessCount

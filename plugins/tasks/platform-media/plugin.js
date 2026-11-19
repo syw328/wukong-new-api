@@ -108,9 +108,12 @@ export function buildContentRequest(ctx) {
 function renderTask(ctx, task) {
   const data = task.data || {};
   const status = { SUCCESS: "completed", FAILURE: "failed" }[String(task.status).toUpperCase()] || "processing";
+  const billing = data.billing || {};
+  const charged = status !== "processing" && billing.state === "settled"
+    && Number.isFinite(billing.charged) && billing.charged >= 0 ? billing.charged : null;
   const artifacts = task.artifacts || [];
   return { id: task.task_id, object: "media.generation", model: task.model || data.model, modality: modalityOf(task),
-    status: status, billing: { currency: "CREDITS", state: status === "processing" ? "pending" : "settled" },
+    status: status, billing: { currency: "CREDITS", state: status === "processing" ? "pending" : "settled", charged: charged },
     result: status === "completed" ? { artifacts_url: "/v1/tasks/" + encodeURIComponent(task.task_id) + "/artifacts", artifacts: artifacts } : null,
     error: status === "failed" ? { code: (data.error || {}).code || "generation_failed", message: failureReason(data) } : null,
     poll_after_seconds: status === "processing" ? 3 : null };

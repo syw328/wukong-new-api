@@ -264,7 +264,7 @@ export function responseExample(model: PlatformModel): Record<string, unknown> {
     object: 'media.generation',
     model: model.id,
     status: 'processing',
-    billing: { currency: 'CREDITS', state: 'pending' },
+    billing: { currency: 'CREDITS', state: 'pending', charged: null },
     result: null,
     error: null,
     poll_after_seconds: 3,
