@@ -2,6 +2,7 @@ package helper
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -92,6 +93,29 @@ func (w nativeStreamWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
+// The native observer receives one complete SSE payload even when a supplier
+// wraps its JSON across several data lines. The tee keeps the original framing.
+func splitNativeEvent(data []byte, eof bool) (int, []byte, error) {
+	var fields [][]byte
+	for pos := 0; pos < len(data); {
+		advance, line, err := bufio.ScanLines(data[pos:], eof)
+		if err != nil || advance == 0 {
+			return 0, nil, err
+		}
+		pos += advance
+		if bytes.HasPrefix(line, []byte("data:")) {
+			fields = append(fields, bytes.TrimPrefix(line[5:], []byte(" ")))
+		}
+		if len(line) == 0 || (eof && pos == len(data)) {
+			if len(fields) == 0 {
+				return pos, []byte{}, nil
+			}
+			return pos, append([]byte("data: "), bytes.Join(fields, []byte("\n"))...), nil
+		}
+	}
+	return 0, nil, nil
+}
+
 func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo, dataHandler func(data string, sr *StreamResult)) {
 
 	if resp == nil || dataHandler == nil {
@@ -162,7 +186,11 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 	// Ensure gin.Context is not returned to Gin's pool while any stream goroutine can still use it.
 	defer cleanup()
 
-	scanner.Split(bufio.ScanLines)
+	if info.PlatformNativeWire {
+		scanner.Split(splitNativeEvent)
+	} else {
+		scanner.Split(bufio.ScanLines)
+	}
 	copyCodexSSEHeaders(c, resp)
 	SetEventStreamHeaders(c)
 

@@ -127,7 +127,7 @@ func nativeResponsesClient(c *gin.Context, request *dto.OpenAIResponsesRequest) 
 	}
 	if input := strings.TrimSpace(string(request.Input)); strings.HasPrefix(input, "[") && common.Unmarshal(request.Input, &items) == nil {
 		for _, item := range items {
-			if item.Type == "additional_tools" || item.Type == "reasoning" || item.Type == "compaction" {
+			if item.Type == "additional_tools" || item.Type == "item_reference" || item.Type == "reasoning" || item.Type == "compaction" {
 				return true
 			}
 		}

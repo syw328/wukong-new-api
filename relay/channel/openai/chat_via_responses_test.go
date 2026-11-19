@@ -285,7 +285,7 @@ func TestPlatformNativeFramesAreUnchangedAndUsageIsMetered(t *testing.T) {
 	constant.StreamingTimeout = 30
 	t.Cleanup(func() { constant.StreamingTimeout = oldTimeout })
 	wire := ": vendor heartbeat\r\n\r\n" +
-		"data: {\"id\":\"chatcmpl-test\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"OK\",\"vendor_field\":7}}]}\r\n\r\n" +
+		"event: message\r\ndata: {\"id\":\"chatcmpl-test\",\r\ndata: \"choices\":[{\"index\":0,\"delta\":{\"content\":\"OK\",\"vendor_field\":7}}]}\r\n\r\n" +
 		"data: {\"choices\":[],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":1,\"total_tokens\":6}}\n\n" +
 		"data: [DONE]\n\n"
 	c, recorder, resp, info := newResponsesChatTestContext(t, wire, true)
