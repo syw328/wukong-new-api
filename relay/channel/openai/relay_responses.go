@@ -89,7 +89,9 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 			sr.Error(err)
 			return
 		}
-		sendResponsesStreamData(c, streamResponse, data)
+		if !info.PlatformNativeWire {
+			sendResponsesStreamData(c, streamResponse, data)
+		}
 		if terminal != "" {
 			return // An observed terminal receipt cannot be replaced by trailing data.
 		}

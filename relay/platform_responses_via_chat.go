@@ -111,6 +111,9 @@ func nativeResponsesClient(c *gin.Context, request *dto.OpenAIResponsesRequest) 
 	if request == nil {
 		return false
 	}
+	if request.PreviousResponseID != "" || string(request.Store) == "true" {
+		return true
+	}
 	var metadata map[string]json.RawMessage
 	if len(request.ClientMetadata) > 0 && common.Unmarshal(request.ClientMetadata, &metadata) == nil {
 		for key := range metadata {
@@ -124,7 +127,7 @@ func nativeResponsesClient(c *gin.Context, request *dto.OpenAIResponsesRequest) 
 	}
 	if input := strings.TrimSpace(string(request.Input)); strings.HasPrefix(input, "[") && common.Unmarshal(request.Input, &items) == nil {
 		for _, item := range items {
-			if item.Type == "additional_tools" {
+			if item.Type == "additional_tools" || item.Type == "reasoning" || item.Type == "compaction" {
 				return true
 			}
 		}

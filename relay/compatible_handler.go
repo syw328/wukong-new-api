@@ -103,7 +103,10 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 
 	var requestBody io.Reader
 
-	if passThroughGlobal || info.ChannelSetting.PassThroughBodyEnabled {
+	nativePlatformChat := channel.PlatformRelayChannel(info) && info.RelayFormat == types.RelayFormatOpenAI &&
+		info.RelayMode == relayconstant.RelayModeChatCompletions
+	info.PlatformNativeWire = nativePlatformChat
+	if nativePlatformChat || passThroughGlobal || info.ChannelSetting.PassThroughBodyEnabled {
 		storage, err := common.GetBodyStorage(c)
 		if err != nil {
 			return types.NewErrorWithStatusCode(err, types.ErrorCodeReadRequestBodyFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry())

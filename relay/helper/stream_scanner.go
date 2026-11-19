@@ -80,6 +80,18 @@ func ExtendWriteDeadline(c *gin.Context) {
 	_ = http.NewResponseController(c.Writer).SetWriteDeadline(time.Now().Add(streamWriteTimeout))
 }
 
+// Forward provider bytes with backpressure while the existing scanner meters the same read.
+type nativeStreamWriter struct{ c *gin.Context }
+
+func (w nativeStreamWriter) Write(p []byte) (int, error) {
+	ExtendWriteDeadline(w.c)
+	n, err := w.c.Writer.Write(p)
+	if err == nil {
+		w.c.Writer.Flush()
+	}
+	return n, err
+}
+
 func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo, dataHandler func(data string, sr *StreamResult)) {
 
 	if resp == nil || dataHandler == nil {
@@ -92,10 +104,14 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 	ctx, cancel := context.WithCancel(context.Background())
 
 	streamingTimeout := time.Duration(constant.StreamingTimeout) * time.Second
+	var source io.Reader = resp.Body
+	if info.PlatformNativeWire {
+		source = io.TeeReader(source, nativeStreamWriter{c})
+	}
 
 	var (
 		stopChan    = make(chan bool, 3) // 增加缓冲区避免阻塞
-		scanner     = NewStreamScanner(resp.Body)
+		scanner     = NewStreamScanner(source)
 		ticker      = time.NewTicker(streamingTimeout)
 		pingTicker  *time.Ticker
 		writeMutex  sync.Mutex     // Mutex to protect concurrent writes
@@ -111,7 +127,7 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 	}
 
 	generalSettings := operation_setting.GetGeneralSetting()
-	pingEnabled := generalSettings.PingIntervalEnabled && !info.DisablePing
+	pingEnabled := generalSettings.PingIntervalEnabled && !info.DisablePing && !info.PlatformNativeWire
 	pingInterval := time.Duration(generalSettings.PingIntervalSeconds) * time.Second
 	if pingInterval <= 0 {
 		pingInterval = DefaultPingInterval

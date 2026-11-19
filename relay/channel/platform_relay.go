@@ -144,6 +144,9 @@ func injectPlatformRelayHeaders(headers map[string]string, info *common.RelayInf
 	if err != nil {
 		return err
 	}
+	if info.PlatformResponsesMayConvert {
+		headers["X-Platform-Responses-Routing"] = "chat-compatible"
+	}
 	headers[platformRelaySecretHeader] = cfg.secret
 	headers[platformRelayUserHeader] = userID
 	headers[service.PlatformKeyContextHeader] = policy

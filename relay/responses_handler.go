@@ -81,14 +81,22 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 	}
 	adaptor.Init(info)
 	platformRelay := info.RelayMode == relayconstant.RelayModeResponses && channel.PlatformRelayChannel(info)
-	nativeResponses := platformRelay && nativeResponsesClient(c, request)
-	if platformRelay && !nativeResponses {
+	requiresNative := platformRelay && nativeResponsesClient(c, request)
+	nativeResponses := platformRelay && (requiresNative || strings.HasPrefix(strings.ToLower(request.Model), "gpt-"))
+	info.PlatformNativeWire = nativeResponses
+	info.PlatformResponsesMayConvert = nativeResponses && !requiresNative
+	defer func() { info.PlatformResponsesMayConvert = false }()
+	viaChat := func() *types.NewAPIError {
+		info.PlatformNativeWire = false
+		info.PlatformResponsesMayConvert = false
 		usage, apiErr := platformResponsesViaChat(c, info, adaptor, request)
-		if apiErr != nil {
-			return apiErr
+		if apiErr == nil {
+			service.PostTextConsumeQuota(c, info, usage, nil)
 		}
-		service.PostTextConsumeQuota(c, info, usage, nil)
-		return nil
+		return apiErr
+	}
+	if platformRelay && !nativeResponses {
+		return viaChat()
 	}
 	var requestBody io.Reader
 	if model_setting.GetGlobalSettings().PassThroughRequestEnabled || info.ChannelSetting.PassThroughBodyEnabled || nativeResponses {
@@ -143,6 +151,13 @@ func ResponsesHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *
 	if resp != nil {
 		httpResp = resp.(*http.Response)
 
+		// Only the authenticated platform may signal that a route was unavailable
+		// before dispatch. A paid error or an interrupted response is never replayed here.
+		if platformRelay && !requiresNative && httpResp.StatusCode == http.StatusNotFound &&
+			httpResp.Header.Get("X-Platform-Responses-Compatibility") == "chat" {
+			httpResp.Body.Close()
+			return viaChat()
+		}
 		if httpResp.StatusCode != http.StatusOK {
 			newAPIError = service.RelayErrorHandler(c.Request.Context(), httpResp, false)
 			// reset status code 重置状态码

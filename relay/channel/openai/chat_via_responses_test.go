@@ -10,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/gin-gonic/gin"
@@ -277,4 +278,22 @@ func requireOrderedSubstrings(t *testing.T, s string, parts ...string) {
 		require.NotEqualf(t, -1, idx, "missing %q after byte offset %d", part, offset)
 		offset += idx + len(part)
 	}
+}
+
+func TestPlatformNativeFramesAreUnchangedAndUsageIsMetered(t *testing.T) {
+	oldTimeout := constant.StreamingTimeout
+	constant.StreamingTimeout = 30
+	t.Cleanup(func() { constant.StreamingTimeout = oldTimeout })
+	wire := ": vendor heartbeat\r\n\r\n" +
+		"data: {\"id\":\"chatcmpl-test\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"OK\",\"vendor_field\":7}}]}\r\n\r\n" +
+		"data: {\"choices\":[],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":1,\"total_tokens\":6}}\n\n" +
+		"data: [DONE]\n\n"
+	c, recorder, resp, info := newResponsesChatTestContext(t, wire, true)
+	info.RelayFormat = types.RelayFormatOpenAI
+	info.RelayMode = relayconstant.RelayModeChatCompletions
+	info.PlatformNativeWire = true
+	usage, apiErr := OaiStreamHandler(c, info, resp)
+	require.Nil(t, apiErr)
+	assert.Equal(t, 6, usage.TotalTokens)
+	assert.Equal(t, wire, recorder.Body.String())
 }

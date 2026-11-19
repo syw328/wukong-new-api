@@ -165,6 +165,8 @@ func TestNativeResponsesClientRecognisesCodexTurns(t *testing.T) {
 		c.Request.Header.Set("User-Agent", agent)
 		return c
 	}
+	state := &dto.OpenAIResponsesRequest{Model: "gpt-5.6-sol", PreviousResponseID: "resp_previous"}
+	assert.True(t, nativeResponsesClient(contextWithAgent("OpenAI/Python"), state))
 	plain := &dto.OpenAIResponsesRequest{Model: "gpt-5.6-sol", Input: json.RawMessage(`"hi"`)}
 	assert.True(t, nativeResponsesClient(contextWithAgent("codex_cli_rs/0.154.0 (Mac OS 26.5.0; arm64)"), plain))
 	assert.False(t, nativeResponsesClient(contextWithAgent("OpenAI/Python 2.3.0"), plain), "ordinary clients keep the chat conversion")

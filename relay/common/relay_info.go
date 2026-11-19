@@ -82,6 +82,9 @@ type TokenCountMeta struct {
 }
 
 type RelayInfo struct {
+	PlatformNativeWire          bool // The platform already returned the public protocol; observe usage without re-encoding.
+	PlatformResponsesMayConvert bool // Platform can choose its normal Chat route before any paid dispatch.
+
 	TokenId           int
 	TokenKey          string
 	TokenGroup        string

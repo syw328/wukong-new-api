@@ -121,11 +121,17 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	seenStreamToolCalls := make(map[string]struct{})
 	var streamFunctionCallNames []string
 	var streamError *types.NewAPIError
+	nativeStop := false
 
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
 		// HTTP 200 is only the transport envelope. An SSE error is a failed
 		// request, never an empty completion to bill from estimated input.
-		var frame dto.GeneralErrorResponse
+		var frame struct {
+			dto.GeneralErrorResponse
+			Choices []struct {
+				FinishReason string `json:"finish_reason"`
+			} `json:"choices"`
+		}
 		if err := common.UnmarshalJsonStr(data, &frame); err != nil {
 			streamError = types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusBadGateway, types.ErrOptionWithSkipRetry())
 			sr.Stop(streamError)
@@ -143,7 +149,12 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 			sr.Stop(streamError)
 			return
 		}
-		if lastStreamData != "" {
+		if info.PlatformNativeWire {
+			for _, choice := range frame.Choices {
+				nativeStop = nativeStop || choice.FinishReason != ""
+			}
+		}
+		if lastStreamData != "" && !info.PlatformNativeWire {
 			if err := HandleStreamFormat(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent); err != nil {
 				common.SysLog("error handling stream format: " + err.Error())
 				sr.Error(err)
@@ -166,7 +177,7 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	if streamError != nil {
 		return nil, streamError
 	}
-	if responseTextBuilder.Len() == 0 && toolCount == 0 {
+	if responseTextBuilder.Len() == 0 && toolCount == 0 && !nativeStop {
 		return nil, types.NewOpenAIError(fmt.Errorf("upstream stream returned no content or tool calls"),
 			types.ErrorCodeBadResponseBody, http.StatusBadGateway, types.ErrOptionWithSkipRetry())
 	}
@@ -202,7 +213,7 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	}
 
 	if info.RelayFormat == types.RelayFormatOpenAI {
-		if shouldSendLastResp {
+		if shouldSendLastResp && !info.PlatformNativeWire {
 			_ = sendStreamData(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent)
 		}
 	}
@@ -218,7 +229,9 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 		info.CountBillableToolCall(dto.BuildInCallFunctionCall, name)
 	}
 
-	HandleFinalResponse(c, info, lastStreamData, responseId, createAt, model, systemFingerprint, usage, containStreamUsage)
+	if !info.PlatformNativeWire {
+		HandleFinalResponse(c, info, lastStreamData, responseId, createAt, model, systemFingerprint, usage, containStreamUsage)
+	}
 
 	return usage, nil
 }
@@ -341,6 +354,9 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 
 	switch info.RelayFormat {
 	case types.RelayFormatOpenAI:
+		if info.PlatformNativeWire {
+			break
+		}
 		if usageModified {
 			var bodyMap map[string]any
 			err = common.Unmarshal(responseBody, &bodyMap)
