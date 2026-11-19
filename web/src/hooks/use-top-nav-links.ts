@@ -60,6 +60,7 @@ export function useTopNavLinks(): TopNavLink[] {
   const docsLink: string | undefined = status?.docs_link as string | undefined
 
   const isAuthed = !!auth?.user
+  const isPlatformPortal = !!portalRuntime().basePath
 
   const links: TopNavLink[] = []
 
@@ -78,7 +79,7 @@ export function useTopNavLinks(): TopNavLink[] {
   if (pricing && typeof pricing === 'object' && pricing.enabled) {
     const requiresAuth = pricing.requireAuth && !isAuthed
     links.push({ title: t('Model Square'), href: '/pricing', requiresAuth })
-    if (portalRuntime().basePath) {
+    if (isPlatformPortal) {
       links.push({
         title: t('Model Prices'),
         href: '/model-prices',
@@ -96,7 +97,7 @@ export function useTopNavLinks(): TopNavLink[] {
 
   // Docs (supports external links)
   if (modules?.docs !== false) {
-    if (portalRuntime().basePath) {
+    if (isPlatformPortal) {
       links.push({ title: t('Docs'), href: '/docs' })
     } else if (docsLink) {
       links.push({ title: t('Docs'), href: docsLink, external: true })
@@ -106,7 +107,7 @@ export function useTopNavLinks(): TopNavLink[] {
   }
 
   // About
-  if (modules?.about !== false) {
+  if (!isPlatformPortal && modules?.about !== false) {
     links.push({ title: t('About'), href: '/about' })
   }
 
