@@ -709,3 +709,28 @@ func inputContentText(t *testing.T, item map[string]any) string {
 	require.True(t, ok)
 	return text
 }
+
+func TestGeminiVideoPartsKeepTheirMediaTypeInChat(t *testing.T) {
+	request := &dto.GeminiChatRequest{Contents: []dto.GeminiChatContent{{
+		Role: "user", Parts: []dto.GeminiPart{
+			{Text: "compare"},
+			{InlineData: &dto.GeminiInlineData{MimeType: "video/mp4", Data: "AAAA"}},
+			{InlineData: &dto.GeminiInlineData{MimeType: "image/png", Data: "AAAA"}},
+			{FileData: &dto.GeminiFileData{MimeType: "video/mp4", FileUri: "https://example.com/uploads/video.mp4"}},
+		},
+	}}}
+	got, err := GeminiGenerateContentRequestToOpenAIChat(request, nil)
+	require.NoError(t, err)
+	wire, err := kitutil.Marshal(got)
+	require.NoError(t, err)
+	var roundTrip dto.GeneralOpenAIRequest
+	require.NoError(t, kitutil.Unmarshal(wire, &roundTrip))
+	parts := roundTrip.Messages[0].ParseContent()
+	require.Len(t, parts, 4)
+	assert.Equal(t, dto.ContentTypeVideoUrl, parts[1].Type)
+	require.NotNil(t, parts[1].GetVideoUrl())
+	assert.Equal(t, "data:video/mp4;base64,AAAA", parts[1].GetVideoUrl().Url)
+	assert.Equal(t, dto.ContentTypeImageURL, parts[2].Type)
+	require.NotNil(t, parts[3].GetVideoUrl())
+	assert.Equal(t, "https://example.com/uploads/video.mp4", parts[3].GetVideoUrl().Url)
+}

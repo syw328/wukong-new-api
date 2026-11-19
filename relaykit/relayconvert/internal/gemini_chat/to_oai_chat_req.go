@@ -78,6 +78,12 @@ func GeminiGenerateContentRequestToOpenAIChat(geminiRequest *dto.GeminiChatReque
 				}
 				mediaContents = append(mediaContents, mediaContent)
 			} else if part.InlineData != nil {
+				if strings.HasPrefix(strings.ToLower(part.InlineData.MimeType), "video/") {
+					mediaContents = append(mediaContents, dto.MediaContent{
+						Type: dto.ContentTypeVideoUrl, VideoUrl: &dto.MessageVideoUrl{Url: fmt.Sprintf("data:%s;base64,%s", part.InlineData.MimeType, part.InlineData.Data)},
+					})
+					continue
+				}
 				mediaContent := dto.MediaContent{
 					Type: "image_url",
 					ImageUrl: &dto.MessageImageUrl{
@@ -88,6 +94,12 @@ func GeminiGenerateContentRequestToOpenAIChat(geminiRequest *dto.GeminiChatReque
 				}
 				mediaContents = append(mediaContents, mediaContent)
 			} else if part.FileData != nil {
+				if strings.HasPrefix(strings.ToLower(part.FileData.MimeType), "video/") {
+					mediaContents = append(mediaContents, dto.MediaContent{
+						Type: dto.ContentTypeVideoUrl, VideoUrl: &dto.MessageVideoUrl{Url: part.FileData.FileUri},
+					})
+					continue
+				}
 				mediaContent := dto.MediaContent{
 					Type: "image_url",
 					ImageUrl: &dto.MessageImageUrl{

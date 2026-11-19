@@ -783,13 +783,13 @@ func (m *Message) ParseContent() []MediaContent {
 				}
 			}
 		case ContentTypeVideoUrl:
-			if videoUrl, ok := contentItem["video_url"].(string); ok {
-				contentList = append(contentList, MediaContent{
-					Type: ContentTypeVideoUrl,
-					VideoUrl: &MessageVideoUrl{
-						Url: videoUrl,
-					},
-				})
+			value := contentItem["video_url"]
+			if url, ok := value.(string); ok {
+				value = &MessageVideoUrl{Url: url}
+			}
+			part := MediaContent{Type: ContentTypeVideoUrl, VideoUrl: value}
+			if video := part.GetVideoUrl(); video != nil && video.Url != "" {
+				contentList = append(contentList, part)
 			}
 		}
 	}
