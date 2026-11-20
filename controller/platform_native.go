@@ -99,7 +99,7 @@ func relayPlatformRequest(c *gin.Context, path string, body io.Reader, size int6
 		return
 	}
 	defer response.Body.Close()
-	if !copyPlatformJSONResponse(c, response) {
+	if err := copyPlatformJSONResponse(c, response); err != nil {
 		abortPlatformRelay(c, http.StatusServiceUnavailable, "platform_response_invalid", "Invalid platform response")
 	}
 }

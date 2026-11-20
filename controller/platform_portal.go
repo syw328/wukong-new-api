@@ -4,6 +4,7 @@ package controller
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -88,25 +89,49 @@ func proxyPlatformPortal(c *gin.Context, path string, accountPrice bool, mediaQu
 		}
 		request.Header.Set("Authorization", "Bearer "+key)
 	}
+	readOnly := request.Method == http.MethodGet || mediaQuote || path == "/api/developer/model-prices"
 	response, err := platformPortalClient.Do(request)
 	if err != nil {
-		c.JSON(503, gin.H{"success": false, "message": "Platform request result is unknown; retry with the same Idempotency-Key or query the original order"})
+		if readOnly {
+			platformReadError(c, err)
+		} else {
+			c.JSON(503, gin.H{"success": false, "message": "Platform request result is unknown; retry with the same Idempotency-Key or query the original order"})
+		}
 		return
 	}
 	defer response.Body.Close()
-	if !copyPlatformJSONResponse(c, response) {
-		c.JSON(503, gin.H{"success": false, "message": "Invalid platform response"})
+	if err := copyPlatformJSONResponse(c, response); err != nil {
+		if readOnly {
+			platformReadError(c, err)
+		} else {
+			c.JSON(503, gin.H{"success": false, "message": "Invalid platform response"})
+		}
 	}
+}
+
+func platformReadError(c *gin.Context, err error) {
+	if errors.Is(c.Request.Context().Err(), context.Canceled) {
+		c.Status(499)
+		return
+	}
+	status, code, message := http.StatusBadGateway, "platform_unavailable", "Platform lookup failed"
+	if errors.Is(err, context.DeadlineExceeded) {
+		status, code, message = http.StatusGatewayTimeout, "gateway_timeout", "Platform lookup timed out"
+	}
+	c.JSON(status, gin.H{"success": false, "message": message, "error": gin.H{"type": code, "code": code, "message": message}})
 }
 
 // copyPlatformJSONResponse relays a bounded JSON object with the platform's
 // status and rate-limit headers. A redirect or non-JSON body is refused so a
 // misrouted origin can neither send the caller elsewhere nor leak a page.
-func copyPlatformJSONResponse(c *gin.Context, response *http.Response) bool {
+func copyPlatformJSONResponse(c *gin.Context, response *http.Response) error {
 	data, err := io.ReadAll(io.LimitReader(response.Body, (8<<20)+1))
+	if err != nil {
+		return err
+	}
 	var payload map[string]any
-	if err != nil || len(data) > 8<<20 || common.Unmarshal(data, &payload) != nil || response.StatusCode >= 300 && response.StatusCode < 400 {
-		return false
+	if len(data) > 8<<20 || common.Unmarshal(data, &payload) != nil || response.StatusCode >= 300 && response.StatusCode < 400 {
+		return errors.New("invalid platform JSON response")
 	}
 	for _, name := range []string{"Retry-After", "RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset"} {
 		if value := response.Header.Get(name); value != "" {
@@ -116,7 +141,7 @@ func copyPlatformJSONResponse(c *gin.Context, response *http.Response) bool {
 	c.Header("Cache-Control", "private, no-store")
 	c.Header("Vary", "Cookie, Authorization, Host")
 	c.Data(response.StatusCode, "application/json; charset=utf-8", data)
-	return true
+	return nil
 }
 
 func GetPlatformCatalog(c *gin.Context) {

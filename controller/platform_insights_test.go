@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -129,4 +130,42 @@ func TestPlatformPortalPreservesRetryWindowWithoutForwardingCredentials(t *testi
 	assert.Equal(t, "60", response.Header().Get("RateLimit-Limit"))
 	assert.Equal(t, "0", response.Header().Get("RateLimit-Remaining"))
 	assert.Empty(t, response.Header().Get("Set-Cookie"))
+}
+
+func TestPriceReadCancellationAndDeadline(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("a request already canceled should not reach the platform")
+	}))
+	t.Cleanup(upstream.Close)
+	common.OptionMapRWMutex.Lock()
+	previous := common.OptionMap
+	common.OptionMap = map[string]string{"PlatformPublicBaseURL": upstream.URL}
+	common.OptionMapRWMutex.Unlock()
+	t.Cleanup(func() { common.OptionMapRWMutex.Lock(); common.OptionMap = previous; common.OptionMapRWMutex.Unlock() })
+	router := gin.New()
+	router.POST("/prices", PostPlatformModelPrices)
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	expired, stop := context.WithTimeout(context.Background(), 0)
+	defer stop()
+	for _, tc := range []struct {
+		name   string
+		ctx    context.Context
+		status int
+	}{
+		{"caller canceled", canceled, 499},
+		{"deadline", expired, http.StatusGatewayTimeout},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/prices", strings.NewReader(`{"model":"test"}`)).WithContext(tc.ctx)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			require.Equal(t, tc.status, w.Code)
+			if tc.status == http.StatusGatewayTimeout {
+				assert.Contains(t, w.Body.String(), `"code":"gateway_timeout"`)
+			} else {
+				assert.Empty(t, w.Body.String())
+			}
+		})
+	}
 }
