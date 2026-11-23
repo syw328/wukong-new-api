@@ -746,12 +746,14 @@ func PrepareTaskPluginEndpoint() gin.HandlerFunc {
 }
 
 func buildTaskPluginRouteRequest(c *gin.Context) (pluginruntime.RouteRequestContext, error) {
+	portal, _ := common.PlatformPortalForRequest(c.Request)
 	requestContext := pluginruntime.RouteRequestContext{
-		Path:   c.Request.URL.Path,
-		Method: c.Request.Method,
-		Params: make(map[string]string, len(c.Params)),
-		Query:  make(map[string][]string),
-		Body:   map[string]any{"kind": string(pluginruntime.BodyNone)},
+		TransportPath: portal.TransportPath,
+		Path:          c.Request.URL.Path,
+		Method:        c.Request.Method,
+		Params:        make(map[string]string, len(c.Params)),
+		Query:         make(map[string][]string),
+		Body:          map[string]any{"kind": string(pluginruntime.BodyNone)},
 	}
 	for _, param := range c.Params {
 		requestContext.Params[param.Key] = param.Value
@@ -1250,6 +1252,21 @@ func RespondTaskPluginError(c *gin.Context, taskErr *dto.TaskError) bool {
 		return false
 	}
 	sanitized := sanitizedTaskPluginError(taskErr.StatusCode, taskErr.Message)
+	// The platform is the authority for quote recovery. Preserve its documented conflicts.
+	if pinned.Plugin.Meta.Key == "platform-media" && taskErr.Code == "fail_to_fetch_task" && taskErr.StatusCode == http.StatusConflict {
+		var reply struct {
+			Error struct {
+				Code    string
+				Message string
+			}
+		}
+		if common.UnmarshalJsonStr(taskErr.Message, &reply) == nil {
+			switch reply.Error.Code {
+			case "quote_expired", "quote_mismatch", "route_unavailable", "price_reconfirmation_required", "idempotency_conflict":
+				sanitized.Code, sanitized.Message = reply.Error.Code, reply.Error.Message
+			}
+		}
+	}
 	requestID := c.GetString(common.RequestIdKey)
 	hasRenderer, err := pinned.Plugin.Engine.HasCallablePath(c.Request.Context(), "native", "error")
 	requestValue, exists := c.Get(pluginruntime.ContextKeyRouteRequest)

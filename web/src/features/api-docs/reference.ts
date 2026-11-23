@@ -171,12 +171,20 @@ export function requestFields(model: PlatformModel): Row[] {
     ],
   ]
 }
-export const recoveryGuidance = [
-  '401 / 403: check the key, its permissions and the current site. 400: check the model and request fields. 429: reduce request frequency and follow the response guidance.',
-  'For media, an expired quote or changed request requires a new quote before a new submission. A conflicting Idempotency-Key must not be used for a different order.',
-  'A timeout or 5xx response does not prove that generation failed. Save the request, key and task ID; query the original task before retrying. Never blindly create another paid task.',
-  'Listed prices are references. Media authorization and final charges come from the server quote and settlement; unknown task results must be reconciled before assuming a refund.',
+const mediaReceiptGuidance = [
+  'requested_route_id is the route you requested. quoted_route_id is the first route selected for this quote. Automatic failover may change the execution route.',
+  'For unknown status, keep the task ID and poll after poll_after_seconds. For quote_expired or quote_mismatch, request a fresh quote before submitting.',
+  'Use your key to read the artifact list. Each content_url is a long-lived signed download link. Share it privately and keep it out of logs.',
 ]
+export function recoveryGuidance(model: PlatformModel): string[] {
+  return [
+    ...(model.type === 'chat' ? [] : mediaReceiptGuidance),
+    '401 / 403: check the key, its permissions and the current site. 400: check the model and request fields. 429: reduce request frequency and follow the response guidance.',
+    'For media, an expired quote or changed request requires a new quote before a new submission. A conflicting Idempotency-Key must not be used for a different order.',
+    'A timeout or 5xx response does not prove that generation failed. Save the request, key and task ID; query the original task before retrying. Never blindly create another paid task.',
+    'Listed prices are references. Media authorization and final charges come from the server quote and settlement; unknown task results must be reconciled before assuming a refund.',
+  ]
+}
 export function modelDocument(
   model: PlatformModel,
   root: string,
@@ -220,7 +228,7 @@ export function modelDocument(
     ),
     `## ${t('Responses and recovery')}`,
     t(responseIntro(model)),
-    ...recoveryGuidance.map((text) => t(text)),
+    ...recoveryGuidance(model).map((text) => t(text)),
     `## ${t('Example response shape')}`,
     '```json',
     JSON.stringify(responseExample(model), null, 2),

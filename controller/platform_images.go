@@ -250,7 +250,8 @@ func PlatformImagesCompatibility(router http.Handler) gin.HandlerFunc {
 				return
 			}
 			var task struct {
-				Status string `json:"status"`
+				Status           string `json:"status"`
+				PollAfterSeconds int    `json:"poll_after_seconds"`
 			}
 			if common.Unmarshal(status.body.Bytes(), &task) != nil {
 				bridge.fail(c, 502, "invalid_task_response", "Query the original task before retrying", taskID)
@@ -272,7 +273,7 @@ func PlatformImagesCompatibility(router http.Handler) gin.HandlerFunc {
 			case <-ctx.Done():
 				bridge.fail(c, 504, "image_generation_pending", "The image task is still pending; reuse its task ID and Idempotency-Key", taskID)
 				return
-			case <-time.After(3 * time.Second):
+			case <-time.After(time.Duration(max(3, task.PollAfterSeconds)) * time.Second):
 			}
 		}
 	}
@@ -377,7 +378,7 @@ func (bridge platformImageBridge) fail(c *gin.Context, status int, code, message
 	errorBody := gin.H{"code": code, "type": "new_api_error", "message": message}
 	if taskID != "" {
 		errorBody["task_id"] = taskID
-		errorBody["task_url"] = "/v1/media/generations/" + taskID
+		errorBody["task_url"] = common.PlatformMediaTaskPath(c.Request, taskID)
 		c.Header("X-Task-Id", taskID)
 	}
 	c.JSON(status, gin.H{"error": errorBody})

@@ -107,16 +107,17 @@ export function buildContentRequest(ctx) {
 }
 function renderTask(ctx, task) {
   const data = task.data || {};
-  const status = { SUCCESS: "completed", FAILURE: "failed" }[String(task.status).toUpperCase()] || "processing";
+  const status = { SUCCESS: "completed", FAILURE: "failed" }[String(task.status).toUpperCase()] || (data.status === "unknown" ? "unknown" : "processing");
+  const terminal = status === "completed" || status === "failed";
   const billing = data.billing || {};
-  const charged = status !== "processing" && billing.state === "settled"
+  const charged = terminal && billing.state === "settled"
     && Number.isFinite(billing.charged) && billing.charged >= 0 ? billing.charged : null;
   const artifacts = task.artifacts || [];
   return { id: task.task_id, object: "media.generation", model: task.model || data.model, modality: modalityOf(task),
-    status: status, billing: { currency: "CREDITS", state: status === "processing" ? "pending" : "settled", charged: charged },
-    result: status === "completed" ? { artifacts_url: "/v1/tasks/" + encodeURIComponent(task.task_id) + "/artifacts", artifacts: artifacts } : null,
+    status: status, billing: { currency: "CREDITS", state: terminal ? "settled" : "pending", charged: charged },
+    result: status === "completed" ? { artifacts_url: (ctx.transportPath || "") + "/v1/tasks/" + encodeURIComponent(task.task_id) + "/artifacts", artifacts: artifacts } : null,
     error: status === "failed" ? { code: (data.error || {}).code || "generation_failed", message: failureReason(data) } : null,
-    poll_after_seconds: status === "processing" ? 3 : null };
+    poll_after_seconds: terminal ? null : status === "unknown" ? 30 : 3 };
 }
 export const native = {
   decodeSubmit: function(ctx) {

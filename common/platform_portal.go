@@ -46,6 +46,12 @@ func PlatformPortalForRequest(r *http.Request) (PlatformPortal, bool) {
 	return portal, true
 }
 
+// PlatformMediaTaskPath names the native task on the same public entry point as the request.
+func PlatformMediaTaskPath(r *http.Request, taskID string) string {
+	portal, _ := PlatformPortalForRequest(r)
+	return portal.TransportPath + "/v1/media/generations/" + url.PathEscape(taskID)
+}
+
 // PlatformPortalOrigin is where the portal calls the platform back: the signed
 // tenant origin of this request, else the configured PlatformPublicBaseURL.
 func PlatformPortalOrigin(r *http.Request) (string, bool) {

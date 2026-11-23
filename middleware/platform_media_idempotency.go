@@ -120,14 +120,21 @@ func PlatformMediaIdempotency() gin.HandlerFunc {
 				return
 			}
 			status := "processing"
+			if data["status"] == "unknown" {
+				status = "unknown"
+			}
 			if previous.Status == model.TaskStatusSuccess {
 				status = "completed"
 			}
 			if previous.Status == model.TaskStatusFailure {
 				status = "failed"
 			}
-			c.AbortWithStatusJSON(200, gin.H{"id": taskID, "object": "media.generation", "status": status,
-				"replayed": true, "task_url": "/v1/media/generations/" + taskID})
+			reply := gin.H{"id": taskID, "object": "media.generation", "status": status,
+				"replayed": true, "task_url": common.PlatformMediaTaskPath(c.Request, taskID)}
+			if status == "unknown" {
+				reply["poll_after_seconds"] = 30
+			}
+			c.AbortWithStatusJSON(http.StatusOK, reply)
 			return
 		}
 		c.Set("platform_media_public_task_id", taskID)

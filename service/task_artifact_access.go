@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -93,9 +94,13 @@ func ValidateTaskArtifactBaseURL(raw string) error {
 }
 
 // BuildTaskArtifactContentURL returns an absolute, long-lived capability URL.
-// TaskPublicAddress wins when configured; ServerAddress is the only fallback.
+// Prefer an explicit artifact address, then the signed portal mount, then the standalone address.
 // Request Host headers are intentionally not involved.
 func BuildTaskArtifactContentURL(taskID, artifactKey string) (string, error) {
+	return BuildTaskArtifactContentURLForRequest(nil, taskID, artifactKey)
+}
+
+func BuildTaskArtifactContentURLForRequest(request *http.Request, taskID, artifactKey string) (string, error) {
 	taskID = strings.TrimSpace(taskID)
 	artifactKey = strings.TrimSpace(artifactKey)
 	if taskID == "" || len(taskID) > maxTaskArtifactTaskIDLength ||
@@ -104,6 +109,11 @@ func BuildTaskArtifactContentURL(taskID, artifactKey string) (string, error) {
 	}
 
 	baseAddress := strings.TrimSpace(system_setting.TaskPublicAddress)
+	if baseAddress == "" && request != nil {
+		if portal, ok := common.PlatformPortalForRequest(request); ok {
+			baseAddress = portal.Origin + portal.TransportPath
+		}
+	}
 	if baseAddress == "" {
 		baseAddress = strings.TrimSpace(system_setting.ServerAddress)
 	}

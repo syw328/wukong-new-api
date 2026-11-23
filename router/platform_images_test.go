@@ -4,7 +4,10 @@ package router
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"image"
 	"image/png"
@@ -12,6 +15,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -50,17 +54,19 @@ const imageCompatibilityCatalog = `[
 ]`
 
 type platformImageTest struct {
-	server      *httptest.Server
-	engine      *gin.Engine
-	mu          sync.Mutex
-	submissions int
-	quotes      int
-	uploads     int
-	requests    map[string]map[string]any
-	png         []byte
-	fail        bool
-	catalogDown bool
-	cancelRead  context.CancelFunc
+	server         *httptest.Server
+	engine         *gin.Engine
+	mu             sync.Mutex
+	submissions    int
+	quotes         int
+	uploads        int
+	requests       map[string]map[string]any
+	png            []byte
+	fail           bool
+	catalogDown    bool
+	rejectQuote    string
+	awaitingReview bool
+	cancelRead     context.CancelFunc
 }
 
 func newPlatformImageTest(t *testing.T) *platformImageTest {
@@ -141,6 +147,11 @@ func newPlatformImageTest(t *testing.T) *platformImageTest {
 			fixture.quotes++
 			_, _ = io.WriteString(w, `{"authorization_max":0.4,"authorization_token":"signed-fixture-quote","confirmed_price_book_id":"fixture-book"}`)
 		case request.Method == http.MethodPost && request.URL.Path == "/v1/media/generations":
+			if fixture.rejectQuote != "" {
+				w.WriteHeader(http.StatusConflict)
+				_, _ = fmt.Fprintf(w, `{"error":{"code":%q,"type":%q,"message":"Get a new quote"}}`, fixture.rejectQuote, fixture.rejectQuote)
+				return
+			}
 			fixture.submissions++
 			var input map[string]any
 			require.NoError(t, common.DecodeJson(request.Body, &input))
@@ -155,6 +166,10 @@ func newPlatformImageTest(t *testing.T) *platformImageTest {
 		case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/v1/media/generations/"):
 			id := strings.TrimPrefix(request.URL.Path, "/v1/media/generations/")
 			status, charge := "completed", .12
+			if fixture.awaitingReview {
+				_, _ = fmt.Fprintf(w, `{"id":%q,"status":"unknown","billing":{"state":"pending","charged":null}}`, id)
+				return
+			}
 			if fixture.fail {
 				status, charge = "failed", 0
 			}
@@ -590,4 +605,79 @@ func TestPlatformMediaVideoGenerationsPointsToNativeMediaAPI(t *testing.T) {
 	require.NoError(t, model.DB.First(&user, 7).Error)
 	assert.Equal(t, 5_000_000, user.Quota)
 	assert.Zero(t, user.UsedQuota)
+}
+
+func TestPortalMediaReceiptRecovery(t *testing.T) {
+	fixture := newPlatformImageTest(t)
+	const endpoint = "/v1/media/generations"
+	const prefix = "/api/open-platform"
+	const origin = "https://brand.example"
+	const body = `{"model":"gpt-image-2","prompt":"fixture","authorization_max":0.4,"authorization_token":"signed-fixture-quote","confirmed_price_book_id":"fixture-book"}`
+	call := func(method, path, key string, mounted bool) (int, map[string]any) {
+		var input io.Reader
+		if method == http.MethodPost {
+			input = strings.NewReader(body)
+		}
+		req := httptest.NewRequest(method, path, input)
+		req.Header.Set("Authorization", "Bearer imagesalice")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Idempotency-Key", key)
+		if mounted {
+			data, err := common.Marshal(common.PlatformPortal{Origin: origin, BasePath: "/api", TransportPath: prefix})
+			require.NoError(t, err)
+			encoded := base64.RawURLEncoding.EncodeToString(data)
+			mac := hmac.New(sha256.New, []byte(os.Getenv("PLATFORM_RELAY_SECRET")))
+			mac.Write([]byte(encoded))
+			req.Header.Set("X-Platform-Portal-Context", encoded)
+			req.Header.Set("X-Platform-Portal-Signature", hex.EncodeToString(mac.Sum(nil)))
+		}
+		res := httptest.NewRecorder()
+		fixture.engine.ServeHTTP(res, req)
+		var result map[string]any
+		require.NoError(t, common.Unmarshal(res.Body.Bytes(), &result))
+		return res.Code, result
+	}
+	for _, code := range []string{"quote_expired", "quote_mismatch"} {
+		fixture.rejectQuote = code
+		status, rejected := call("POST", endpoint, "audit-"+code, false)
+		require.Equal(t, 409, status)
+		err := rejected["error"].(map[string]any)
+		assert.Equal(t, code, err["code"])
+		assert.NotContains(t, err["message"], "{")
+	}
+	fixture.rejectQuote = ""
+	const order = "portal-receipt-order"
+	status, task := call("POST", endpoint, order, true)
+	require.Equal(t, 200, status)
+	id := task["id"].(string)
+	fixture.awaitingReview = true
+	status, pending := call("GET", endpoint+"/"+id, "", true)
+	require.Equal(t, 200, status, pending)
+	assert.Equal(t, "unknown", pending["status"])
+	assert.Equal(t, 30.0, pending["poll_after_seconds"])
+	assert.Nil(t, pending["billing"].(map[string]any)["charged"])
+	_, replay := call("POST", endpoint, order, true)
+	assert.Equal(t, "unknown", replay["status"])
+	assert.Equal(t, prefix+endpoint+"/"+id, replay["task_url"])
+	fixture.awaitingReview = false
+	_, done := call("GET", endpoint+"/"+id, "", true)
+	assert.Equal(t, "completed", done["status"])
+	assert.Equal(t, 0.12, done["billing"].(map[string]any)["charged"])
+	artifactsPath := "/v1/tasks/" + id + "/artifacts"
+	assert.Equal(t, prefix+artifactsPath, done["result"].(map[string]any)["artifacts_url"])
+	_, root := call("GET", endpoint+"/"+id, "", false)
+	assert.Equal(t, artifactsPath, root["result"].(map[string]any)["artifacts_url"])
+	_, list := call("GET", artifactsPath, "", true)
+	download, err := url.Parse(list["artifacts"].([]any)[0].(map[string]any)["content_url"].(string))
+	require.NoError(t, err)
+	assert.Equal(t, "brand.example", download.Host)
+	assert.Equal(t, prefix+artifactsPath+"/result/content", download.Path)
+	contentRequest := httptest.NewRequest(http.MethodGet, strings.TrimPrefix(download.RequestURI(), prefix), nil)
+	content := httptest.NewRecorder()
+	fixture.engine.ServeHTTP(content, contentRequest)
+	require.Equal(t, http.StatusOK, content.Code)
+	assert.Equal(t, fixture.png, content.Body.Bytes())
+	_, repeated := call("POST", endpoint, order, true)
+	assert.Equal(t, "completed", repeated["status"])
+	require.Equal(t, 1, fixture.submissions)
 }

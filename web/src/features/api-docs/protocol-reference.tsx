@@ -202,7 +202,7 @@ export function ProtocolReference(props: { model?: PlatformModel }) {
               </code>
             </pre>
             <ul className='text-muted-foreground list-disc space-y-2 pl-5 text-sm leading-6'>
-              {recoveryGuidance.map((line) => (
+              {recoveryGuidance(props.model).map((line) => (
                 <li key={line}>{t(line)}</li>
               ))}
             </ul>

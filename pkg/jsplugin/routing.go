@@ -232,13 +232,14 @@ type PinnedEndpoint struct {
 // routing hooks. RequestBody contains decoded JSON or multipart text fields;
 // raw binary and multipart file bytes remain host-owned.
 type RouteRequestContext struct {
-	Path        string              `json:"path"`
-	Method      string              `json:"method"`
-	Params      map[string]string   `json:"params"`
-	Query       map[string][]string `json:"query"`
-	Body        any                 `json:"body"`
-	Files       []map[string]any    `json:"-"`
-	RequestBody any                 `json:"-"`
+	TransportPath string              `json:"-"`
+	Path          string              `json:"path"`
+	Method        string              `json:"method"`
+	Params        map[string]string   `json:"params"`
+	Query         map[string][]string `json:"query"`
+	Body          any                 `json:"body"`
+	Files         []map[string]any    `json:"-"`
+	RequestBody   any                 `json:"-"`
 }
 
 func (r RouteRequestContext) JSValue() map[string]any {
@@ -249,11 +250,12 @@ func (r RouteRequestContext) JSValue() map[string]any {
 		query[key] = append([]string(nil), values...)
 	}
 	return map[string]any{
-		"path":   r.Path,
-		"method": r.Method,
-		"params": params,
-		"query":  query,
-		"body":   clonePluginRequestValue(r.Body),
+		"transportPath": r.TransportPath,
+		"path":          r.Path,
+		"method":        r.Method,
+		"params":        params,
+		"query":         query,
+		"body":          clonePluginRequestValue(r.Body),
 	}
 }
 
