@@ -59,7 +59,8 @@ export function ProtocolGuides(props: { models: PlatformModel[] }) {
         )}
       </p>
       <Tabs defaultValue='chat' className='min-w-0'>
-        <TabsList className='h-auto max-w-full flex-wrap justify-start'>
+        {/* The list variant fixes a horizontal height; let five protocol tabs wrap inside it. */}
+        <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>
           {guides.map((guide) => (
             <TabsTrigger key={guide.id} value={guide.id}>
               {t(guide.title)}
