@@ -1,6 +1,6 @@
 // Copyright (C) 2026 QuantumNous and contributors. AGPL-3.0-or-later.
 import { Link } from '@tanstack/react-router'
-import { Copy, PlugZap } from 'lucide-react'
+import { Copy, Download, PlugZap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { CopyButton } from '@/components/copy-button'
@@ -79,11 +79,26 @@ export function ConnectionInfoCard(props: {
             </p>
           </div>
         </div>
-        {!props.keyId && (
-          <Button size='sm' variant='outline' render={<Link to='/keys' />}>
-            {t('Create API Key')}
+        <div className='flex flex-wrap gap-2'>
+          <Button
+            size='sm'
+            variant='outline'
+            title={t(
+              'An instruction file for AI coding tools: endpoints, authentication, errors and retries of this site'
+            )}
+            render={
+              <a href={`${origin}/v1/skills/SKILL.md`} download='SKILL.md' />
+            }
+          >
+            <Download data-icon='inline-start' />
+            {t('Download SKILL.md')}
           </Button>
-        )}
+          {!props.keyId && (
+            <Button size='sm' variant='outline' render={<Link to='/keys' />}>
+              {t('Create API Key')}
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className='bg-muted/30 mt-4 flex min-w-0 flex-wrap items-center gap-2 rounded-xl border px-3 py-2'>

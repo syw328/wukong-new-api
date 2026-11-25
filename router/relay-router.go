@@ -1,5 +1,5 @@
 // Copyright (C) 2026 QuantumNous and contributors. Licensed under AGPL-3.0-or-later.
-// Modified for platform quotes, balance, recharge, uploads and voice cloning.
+// Modified for platform quotes, balance, recharge, uploads, voice cloning, usage, pricing, feedback, skills and key self-service.
 package router
 
 import (
@@ -26,6 +26,25 @@ func SetRelayRouter(router *gin.Engine) {
 	router.POST("/v1/recharge/orders", middleware.RouteTag("relay"), middleware.TokenAuth(), controller.PostPlatformRecharge)
 	router.GET("/v1/recharge/orders/:order_id", middleware.RouteTag("relay"), middleware.TokenAuth(), controller.GetPlatformRecharge)
 	router.GET("/v1/balance", middleware.RouteTag("relay"), middleware.TokenAuth(), controller.GetPlatformBalance)
+	router.GET("/v1/recharge/options", middleware.RouteTag("relay"), middleware.TokenAuth(), controller.GetPlatformRechargeOptions)
+	router.GET("/v1/usage", middleware.RouteTag("relay"), middleware.TokenAuth(), controller.PlatformUsage)
+	router.GET("/v1/usage/:task_id", middleware.RouteTag("relay"), middleware.TokenAuth(), controller.PlatformUsage)
+	router.GET("/v1/feedback", middleware.RouteTag("relay"), middleware.TokenAuth(), controller.PlatformFeedback)
+	router.POST("/v1/feedback", middleware.RouteTag("relay"), middleware.TokenAuth(), controller.PlatformFeedback)
+	// The skills description needs no key; the platform renders it for this site.
+	router.GET("/v1/skills", middleware.RouteTag("relay"), controller.GetPlatformSkills)
+	router.GET("/v1/skills/SKILL.md", middleware.RouteTag("relay"), controller.GetPlatformSkills)
+	// A portal key reads its own settings; POST needs the key's allow_api_edit.
+	router.GET("/v1/key", middleware.RouteTag("relay"), middleware.TokenAuth(), controller.GetOwnKey)
+	router.POST("/v1/key", middleware.RouteTag("relay"), middleware.TokenAuth(), middleware.TokenOperationAudit(), controller.UpdateOwnKey)
+	// Only the account's sk-mgmt- management key reaches these; it calls nothing else.
+	keysRouter := router.Group("/v1/keys", middleware.RouteTag("relay"), middleware.ManagementKeyAuth(), middleware.TokenOperationAudit())
+	keysRouter.GET("", controller.ListManagedKeys)
+	keysRouter.POST("", controller.CreateManagedKey)
+	keysRouter.GET("/available-routes", controller.GetManagedKeyRoutes)
+	keysRouter.GET("/:id", controller.GetManagedKey)
+	keysRouter.POST("/:id", controller.UpdateManagedKey)
+	keysRouter.DELETE("/:id", controller.DeleteManagedKey)
 	voiceRouter := router.Group("/v1/voices", middleware.RouteTag("relay"), middleware.TokenAuth())
 	voiceRouter.GET("", controller.PlatformVoice)
 	voiceRouter.POST("/clone", controller.PlatformVoice)
@@ -49,13 +68,22 @@ func SetRelayRouter(router *gin.Engine) {
 			}
 		})
 
-		modelsRouter.GET("/:model", func(c *gin.Context) {
+		retrieveModel := func(c *gin.Context) {
 			switch {
 			case c.GetHeader("x-api-key") != "" && c.GetHeader("anthropic-version") != "":
 				controller.RetrieveModel(c, constant.ChannelTypeAnthropic)
 			default:
 				controller.RetrieveModel(c, constant.ChannelTypeOpenAI)
 			}
+		}
+		modelsRouter.GET("/:model", retrieveModel)
+		// GET /v1/models/{model}/pricing; a model ID sent with %2F arrives here split at its slash.
+		modelsRouter.GET("/:model/*rest", func(c *gin.Context) {
+			if c.Param("rest") == "/" {
+				retrieveModel(c)
+				return
+			}
+			controller.PlatformModelPricing(c)
 		})
 	}
 

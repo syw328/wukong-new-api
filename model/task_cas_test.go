@@ -55,6 +55,7 @@ func TestMain(m *testing.M) {
 		&SubscriptionOrder{},
 		&UserSubscription{},
 		&UserOAuthBinding{},
+		&ManagementKey{},
 		&PerfMetric{},
 		&SystemInstance{},
 		&SystemTask{},
@@ -78,6 +79,7 @@ func truncateTables(t *testing.T) {
 		DB.Exec("DELETE FROM two_fas")
 		DB.Exec("DELETE FROM tokens")
 		DB.Exec("DELETE FROM user_oauth_bindings")
+		DB.Exec("DELETE FROM management_keys")
 		DB.Exec("DELETE FROM users")
 		DB.Exec("DELETE FROM logs")
 		DB.Exec("DELETE FROM channels")

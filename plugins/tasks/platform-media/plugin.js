@@ -32,6 +32,8 @@ function request(ctx) {
   return { model: model, prompt: input.prompt || "", params: input.params || {},
     ...(input.route_id !== undefined ? { route_id: input.route_id } : {}),
     ...(input.routing_preference !== undefined ? { routing_preference: input.routing_preference } : {}),
+    // The platform validates and registers the callback; it is not part of the signed quote.
+    ...(input.notify_url !== undefined ? { notify_url: input.notify_url } : {}),
     authorization_token: input.authorization_token, authorization_max: input.authorization_max,
     confirmed_price_book_id: input.confirmed_price_book_id };
 }

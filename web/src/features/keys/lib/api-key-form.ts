@@ -47,6 +47,7 @@ export function getApiKeyFormSchema(t: TFunction, maxAutoGroups = 5) {
       model_limits_enabled: z.boolean(),
       routing_policy: keyRoutingPolicySchema.nullable(),
       allow_ips: z.string().optional(),
+      allow_api_edit: z.boolean(),
       group: z.string().optional(),
       auto_groups_mode: z.enum(['inherit', 'custom']),
       auto_groups: z.array(z.string()),
@@ -126,6 +127,7 @@ export const API_KEY_FORM_DEFAULT_VALUES: ApiKeyFormValues = {
     model_rules: [],
   },
   allow_ips: '',
+  allow_api_edit: false,
   group: DEFAULT_GROUP,
   auto_groups_mode: 'inherit',
   auto_groups: [],
@@ -192,6 +194,7 @@ export function transformFormDataToPayload(
     routing_policy: data.routing_policy,
     model_limits: data.model_limits.join(','),
     allow_ips: data.allow_ips || '',
+    allow_api_edit: data.allow_api_edit,
     group: data.group || '',
     auto_groups:
       data.group === 'auto' && data.auto_groups_mode === 'custom'
@@ -232,6 +235,7 @@ export function transformApiKeyToFormDefaults(
       ? apiKey.model_limits.split(',').filter(Boolean)
       : [],
     allow_ips: apiKey.allow_ips || '',
+    allow_api_edit: apiKey.allow_api_edit === true,
     group: apiKey.group || DEFAULT_GROUP,
     auto_groups_mode: autoGroupsMode,
     auto_groups: autoGroups,

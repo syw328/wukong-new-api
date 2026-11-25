@@ -280,6 +280,10 @@ func SetApiRouter(router *gin.Engine) {
 			tokenRoute.GET("/search", middleware.SearchRateLimit(), controller.SearchTokens)
 			tokenRoute.GET("/auto-groups", controller.GetTokenAutoGroups)
 			tokenRoute.GET("/routing-options", controller.GetTokenRoutingOptions)
+			// The account's single API management key (sk-mgmt-) for /v1/keys.
+			tokenRoute.GET("/management-key", middleware.DisableCache(), controller.GetManagementKeyStatus)
+			tokenRoute.POST("/management-key", middleware.CriticalRateLimit(), middleware.UserCriticalRateLimit("management-key"), middleware.DisableCache(), controller.RotateManagementKey)
+			tokenRoute.DELETE("/management-key", middleware.CriticalRateLimit(), middleware.UserCriticalRateLimit("management-key"), middleware.DisableCache(), controller.DeleteManagementKey)
 			tokenRoute.GET("/:id", controller.GetToken)
 			tokenRoute.POST("/:id/key", middleware.CriticalRateLimit(), middleware.DisableCache(), controller.GetTokenKey)
 			tokenRoute.POST("/", controller.AddToken)

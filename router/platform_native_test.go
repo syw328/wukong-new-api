@@ -1,5 +1,5 @@
 // Copyright (C) 2026 QuantumNous and contributors. Licensed under AGPL-3.0-or-later.
-// Modified for platform-native reference uploads and voice cloning on the portal.
+// Modified for platform-native reference uploads, voice cloning, usage, pricing, feedback and skills on the portal.
 package router
 
 import (
@@ -415,4 +415,135 @@ func TestPlatformVoiceRejectionsNeverReachThePlatform(t *testing.T) {
 	listed := fixture.send(httptest.NewRequest(http.MethodGet, "/v1/voices", nil), "nativeimageonly")
 	assert.Equal(t, http.StatusOK, listed.Code, "listing owned voices follows the platform, which applies no model policy")
 	assert.Len(t, fixture.recorded(), 1)
+}
+
+func TestPlatformUsagePricingAndFeedbackRelayAsTheKeyOwner(t *testing.T) {
+	fixture := newPlatformNativeTest(t)
+	var escaped []string
+	fixture.reply = func(w http.ResponseWriter, r *http.Request) {
+		escaped = append(escaped, r.URL.EscapedPath())
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/feedback" {
+			w.WriteHeader(http.StatusCreated)
+		}
+		_, _ = fmt.Fprintf(w, `{"echo":%q}`, r.URL.Path)
+	}
+	feedback := `{"type":"doc","content":"usage field differs","endpoint":"/v1/usage"}`
+	for _, item := range []struct {
+		method, target, token, body, path, escapedPath, query, keyModel string
+		status                                                          int
+	}{
+		{http.MethodGet, "/v1/usage?days=7&model=gpt-image-2&detail=1&limit=5&scope=user&user_id=someone-else", "nativeowner", "",
+			"/v1/usage", "/v1/usage", "days=7&detail=1&limit=5&model=gpt-image-2&scope=user", "", http.StatusOK},
+		{http.MethodGet, "/v1/usage/apicall_20261125_fixture", "nativeowner", "",
+			"/v1/usage/apicall_20261125_fixture", "/v1/usage/apicall_20261125_fixture", "", "", http.StatusOK},
+		{http.MethodGet, "/v1/models/gpt-image-2/pricing", "nativeimageonly", "",
+			"/v1/models/gpt-image-2/pricing", "/v1/models/gpt-image-2/pricing", "", "gpt-image-2", http.StatusOK},
+		{http.MethodGet, "/v1/models/black-forest-labs%2Fflux-2/pricing", "nativeowner", "",
+			"/v1/models/black-forest-labs/flux-2/pricing", "/v1/models/black-forest-labs%2Fflux-2/pricing", "", "black-forest-labs/flux-2", http.StatusOK},
+		{http.MethodPost, "/v1/feedback", "nativeowner", feedback, "/v1/feedback", "/v1/feedback", "", "", http.StatusCreated},
+		{http.MethodGet, "/v1/feedback?user_id=someone-else", "nativeowner", "", "/v1/feedback", "/v1/feedback", "", "", http.StatusOK},
+	} {
+		t.Run(item.method+" "+item.target, func(t *testing.T) {
+			request := httptest.NewRequest(item.method, item.target, strings.NewReader(item.body))
+			request.Header.Set("Content-Type", "application/json")
+			response := fixture.send(request, item.token)
+			require.Equal(t, item.status, response.Code, response.Body.String())
+			assert.JSONEq(t, fmt.Sprintf(`{"echo":%q}`, item.path), response.Body.String())
+			assert.Equal(t, "12", response.Header().Get("RateLimit-Limit"))
+			assert.Empty(t, response.Header().Get("X-Internal-Upstream"))
+			calls := fixture.recorded()
+			call := calls[len(calls)-1]
+			assert.Equal(t, item.method, call.method)
+			assert.Equal(t, item.path, call.path)
+			assert.Equal(t, item.escapedPath, escaped[len(escaped)-1])
+			assert.Equal(t, item.query, call.query)
+			assert.Equal(t, sha256.Sum256([]byte(item.body)), call.digest)
+			if item.keyModel == "" {
+				assert.Empty(t, call.keyContext)
+				return
+			}
+			context := decodeNativeKeyContext(t, call.keyContext)
+			assert.Equal(t, item.keyModel, context["model"])
+			assert.Equal(t, fmt.Sprint(fixture.tokens[item.token].Id), context["key_id"])
+		})
+	}
+	assert.Len(t, fixture.recorded(), 6)
+}
+
+func TestPlatformSelfServiceRejectionsAndMissingPlatformRoutes(t *testing.T) {
+	fixture := newPlatformNativeTest(t)
+	for _, item := range []struct {
+		name, method, target, token string
+		status                      int
+	}{
+		{"key without the model asks its pricing", http.MethodGet, "/v1/models/speech-2.8/pricing", "nativeimageonly", http.StatusForbidden},
+		{"no platform OAuth binding", http.MethodGet, "/v1/usage", "nativeunbound", http.StatusForbidden},
+		{"invalid key", http.MethodGet, "/v1/usage", "not-a-key", http.StatusUnauthorized},
+		{"disabled key", http.MethodPost, "/v1/feedback", "nativedisabled", http.StatusUnauthorized},
+		{"non-JSON feedback", http.MethodPost, "/v1/feedback", "nativeowner", http.StatusBadRequest},
+		{"dot-segment task id", http.MethodGet, "/v1/usage/..", "nativeowner", http.StatusNotFound},
+		{"unknown model sub-resource", http.MethodGet, "/v1/models/gpt-image-2/prices", "nativeowner", http.StatusNotFound},
+	} {
+		t.Run(item.name, func(t *testing.T) {
+			request := httptest.NewRequest(item.method, item.target, strings.NewReader("type=bug"))
+			assert.Equal(t, item.status, fixture.send(request, item.token).Code)
+		})
+	}
+	assert.Empty(t, fixture.recorded(), "rejected requests must not reach the platform")
+	fixture.reply = func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = io.WriteString(w, `{"error":{"type":"not_found","code":"not_found","message":"接口不存在"}}`)
+	}
+	missing := fixture.send(httptest.NewRequest(http.MethodGet, "/v1/feedback", nil), "nativeowner")
+	assert.Equal(t, http.StatusNotFound, missing.Code, "a platform without the endpoint answers for itself")
+	assert.JSONEq(t, `{"error":{"type":"not_found","code":"not_found","message":"接口不存在"}}`, missing.Body.String())
+}
+
+func TestPlatformSkillsRelayWithoutAnyCredential(t *testing.T) {
+	fixture := newPlatformNativeTest(t)
+	var paths []string
+	contentType := "text/markdown; charset=utf-8"
+	skills := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		assert.Empty(t, r.Header.Get("Authorization"))
+		assert.Empty(t, r.Header.Get("Cookie"))
+		assert.Empty(t, r.Header.Get("X-Platform-Relay-Secret"))
+		assert.Empty(t, r.Header.Get("X-Platform-User-Id"))
+		assert.Empty(t, r.URL.RawQuery)
+		w.Header().Set("Cache-Control", "public, max-age=300")
+		w.Header().Set("X-Internal-Upstream", "must-not-leak")
+		if r.URL.Path == "/v1/skills" {
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			_, _ = io.WriteString(w, `{"name":"fixture-api"}`)
+			return
+		}
+		w.Header().Set("Content-Type", contentType)
+		_, _ = io.WriteString(w, "---\nname: fixture-api\n---\n")
+	}))
+	t.Cleanup(skills.Close)
+	common.OptionMapRWMutex.Lock()
+	common.OptionMap = map[string]string{"PlatformPublicBaseURL": skills.URL}
+	common.OptionMapRWMutex.Unlock()
+	read := func(target string) *httptest.ResponseRecorder {
+		request := httptest.NewRequest(http.MethodGet, target+"?key=sk-nativeowner", nil)
+		request.Header.Set("Authorization", "Bearer sk-nativeowner")
+		request.Header.Set("Cookie", "session=never-forwarded")
+		request.Header.Set("X-Platform-User-Id", "forged-user")
+		response := httptest.NewRecorder()
+		fixture.engine.ServeHTTP(response, request)
+		return response
+	}
+	document := read("/v1/skills")
+	require.Equal(t, http.StatusOK, document.Code, document.Body.String())
+	assert.JSONEq(t, `{"name":"fixture-api"}`, document.Body.String())
+	file := read("/v1/skills/SKILL.md")
+	require.Equal(t, http.StatusOK, file.Code)
+	assert.Equal(t, "---\nname: fixture-api\n---\n", file.Body.String())
+	assert.Equal(t, "text/markdown; charset=utf-8", file.Header().Get("Content-Type"))
+	assert.Equal(t, "public, max-age=300", file.Header().Get("Cache-Control"))
+	assert.Empty(t, file.Header().Get("X-Internal-Upstream"))
+	contentType = "text/html"
+	assert.Equal(t, http.StatusBadGateway, read("/v1/skills/SKILL.md").Code, "only JSON or Markdown comes back")
+	assert.Equal(t, []string{"/v1/skills", "/v1/skills/SKILL.md", "/v1/skills/SKILL.md"}, paths)
+	assert.Empty(t, fixture.recorded())
 }

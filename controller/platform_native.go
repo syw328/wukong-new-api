@@ -1,5 +1,5 @@
 // Copyright (C) 2026 QuantumNous and contributors. Licensed under AGPL-3.0-or-later.
-// Modified for platform-native reference uploads and voice cloning on the portal.
+// Modified for platform-native reference uploads, voice cloning, usage, model pricing and feedback on the portal.
 package controller
 
 import (
@@ -177,4 +177,70 @@ func PlatformVoice(c *gin.Context) {
 	}
 	relayPlatformRequest(c, path, body, size, contentType, keyModel,
 		"Platform request result is unknown; retry with the same Idempotency-Key or query the original voice")
+}
+
+// platformUsageQuery lists the filters GET /v1/usage reads on the platform
+// (server/public-api/publicApiUsage.js); nothing else crosses the relay.
+var platformUsageQuery = []string{"days", "start_time", "end_time", "scope", "detail", "model", "limit", "offset"}
+
+// PlatformUsage relays GET /v1/usage and GET /v1/usage/:task_id. The platform
+// answers for the relayed end user; through the shared service key its
+// scope=key covers all of that user's portal calls.
+func PlatformUsage(c *gin.Context) {
+	path := "/v1/usage"
+	if c.FullPath() == "/v1/usage/:task_id" {
+		id := c.Param("task_id")
+		if id == "." || id == ".." {
+			abortPlatformRelay(c, http.StatusNotFound, "not_found", "Task not found")
+			return
+		}
+		path += "/" + url.PathEscape(id)
+	} else {
+		query := url.Values{}
+		for _, name := range platformUsageQuery {
+			if value, ok := c.GetQuery(name); ok {
+				query.Set(name, value)
+			}
+		}
+		if len(query) > 0 {
+			path += "?" + query.Encode()
+		}
+	}
+	relayPlatformRequest(c, path, nil, 0, "", "", "Platform usage lookup failed; retry")
+}
+
+// PlatformModelPricing relays GET /v1/models/{model}/pricing. It is served by
+// the /v1/models/:model/*rest catch-all so that a model ID sent with %2F keeps
+// its slash, as on the platform. The key's policy for that model marks which
+// routes this key may use.
+func PlatformModelPricing(c *gin.Context) {
+	rest, ok := strings.CutSuffix(c.Param("rest"), "/pricing")
+	name := c.Param("model") + rest
+	if !ok || name == "." || name == ".." || strings.Contains(name, "//") {
+		RelayNotFound(c)
+		return
+	}
+	relayPlatformRequest(c, "/v1/models/"+url.PathEscape(name)+"/pricing", nil, 0, "", name,
+		"Platform pricing lookup failed; retry")
+}
+
+// PlatformFeedback relays GET and POST /v1/feedback; the platform files the
+// feedback under the relayed end user and applies its hourly limit.
+func PlatformFeedback(c *gin.Context) {
+	if c.Request.Method != http.MethodPost {
+		relayPlatformRequest(c, "/v1/feedback", nil, 0, "", "", "Platform feedback lookup failed; retry")
+		return
+	}
+	data, err := io.ReadAll(io.LimitReader(c.Request.Body, (64<<10)+1))
+	if err != nil || len(data) > 64<<10 {
+		abortPlatformRelay(c, http.StatusRequestEntityTooLarge, "payload_too_large", "Request is too large")
+		return
+	}
+	var payload map[string]any
+	if common.Unmarshal(data, &payload) != nil {
+		abortPlatformRelay(c, http.StatusBadRequest, "invalid_request_error", "JSON object required")
+		return
+	}
+	relayPlatformRequest(c, "/v1/feedback", bytes.NewReader(data), int64(len(data)), "application/json", "",
+		"Feedback result is unknown; check GET /v1/feedback before sending it again")
 }

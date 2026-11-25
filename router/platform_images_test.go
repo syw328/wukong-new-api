@@ -513,6 +513,7 @@ func TestPlatformMediaTaskReturnsSettledCharge(t *testing.T) {
 	const body = `{"model":"gpt-image-2","prompt":"fixture","authorization_max":0.4,"authorization_token":"signed-fixture-quote","confirmed_price_book_id":"fixture-book"}`
 	t.Run("successful task reports exact charge on repeated reads", func(t *testing.T) {
 		id := readTask(t, call(http.MethodPost, endpoint, "imagesalice", "fixture-native-success", body), "processing", "pending", nil)
+		assert.NotContains(t, fixture.requests["gpt-image-2"], "notify_url", "a request without a callback reaches the platform unchanged")
 		for range 2 {
 			assert.Equal(t, id, readTask(t, call(http.MethodGet, endpoint+"/"+id, "imagesalice", "", ""), "completed", "settled", .12))
 		}
@@ -522,7 +523,9 @@ func TestPlatformMediaTaskReturnsSettledCharge(t *testing.T) {
 	})
 	t.Run("confirmed failure reports zero charge", func(t *testing.T) {
 		fixture.fail = true
-		id := readTask(t, call(http.MethodPost, endpoint, "imagesalice", "fixture-native-failed", body), "processing", "pending", nil)
+		notified := strings.Replace(body, `"prompt":"fixture"`, `"prompt":"fixture","notify_url":"https://hooks.example.com/media"`, 1)
+		id := readTask(t, call(http.MethodPost, endpoint, "imagesalice", "fixture-native-failed", notified), "processing", "pending", nil)
+		assert.Equal(t, "https://hooks.example.com/media", fixture.requests["gpt-image-2"]["notify_url"], "the portal passes the callback on")
 		assert.Equal(t, id, readTask(t, call(http.MethodGet, endpoint+"/"+id, "imagesalice", "", ""), "failed", "settled", 0.0))
 	})
 	assert.Equal(t, 2, fixture.submissions)

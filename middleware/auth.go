@@ -543,3 +543,47 @@ func SetupContextForToken(c *gin.Context, token *model.Token, parts ...string) e
 	}
 	return nil
 }
+
+func abortManagementAuth(c *gin.Context, status int, code, message string) {
+	c.AbortWithStatusJSON(status, gin.H{"error": gin.H{"type": code, "code": code, "message": message}})
+}
+
+// ManagementKeyAuth admits only an account's sk-mgmt- key on the /v1/keys
+// endpoints. Model keys are refused before any lookup, and TokenAuth never
+// resolves a management key, so neither credential reaches the other surface.
+func ManagementKeyAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		presented, ok := authorizationToken(c.GetHeader("Authorization"))
+		if !ok {
+			abortManagementAuth(c, http.StatusUnauthorized, "management_key_required", "Send the API management key as Authorization: Bearer sk-mgmt-…")
+			return
+		}
+		if !strings.HasPrefix(presented, model.ManagementKeyPrefix) {
+			abortManagementAuth(c, http.StatusForbidden, "management_key_required", "This endpoint accepts only the API management key (sk-mgmt-…), not a model API key")
+			return
+		}
+		key, err := model.ValidateManagementKey(presented)
+		if err != nil {
+			if errors.Is(err, model.ErrManagementKeyInvalid) {
+				abortManagementAuth(c, http.StatusUnauthorized, "invalid_management_key", "The API management key is invalid or has been reset")
+			} else {
+				common.SysLog("ManagementKeyAuth lookup error: " + err.Error())
+				abortManagementAuth(c, http.StatusInternalServerError, "database_error", common.TranslateMessage(c, i18n.MsgDatabaseError))
+			}
+			return
+		}
+		user, err := model.GetUserCache(key.UserId)
+		if err != nil || user.Status != common.UserStatusEnabled {
+			abortManagementAuth(c, http.StatusForbidden, "account_unavailable", common.TranslateMessage(c, i18n.MsgAuthUserBanned))
+			return
+		}
+		model.TouchManagementKey(key)
+		c.Set("id", user.Id)
+		c.Set("username", user.Username)
+		c.Set("role", user.Role)
+		c.Set("group", user.Group)
+		c.Set("management_key_ref", key.KeyHash)
+		user.WriteContext(c)
+		c.Next()
+	}
+}

@@ -25,6 +25,7 @@ import type {
   GetApiKeysResponse,
   SearchApiKeysParams,
   ApiKeyFormData,
+  ManagementKeyStatus,
   TokenAutoGroupsConfig,
 } from './types'
 
@@ -123,5 +124,28 @@ export async function fetchTokenKeysBatch(ids: number[]): Promise<{
   data?: { keys: Record<number, string> }
 }> {
   const res = await api.post('/api/token/batch/keys', { ids })
+  return res.data
+}
+
+// The account's API management key (sk-mgmt-) for the /v1/keys endpoints
+export async function getManagementKeyStatus(): Promise<
+  ApiResponse<ManagementKeyStatus>
+> {
+  const res = await api.get('/api/token/management-key')
+  return res.data
+}
+
+// Create or reset it; the full key is only in this response
+export async function rotateManagementKey(): Promise<
+  ApiResponse<{ key: string; status: ManagementKeyStatus }>
+> {
+  const res = await api.post('/api/token/management-key')
+  return res.data
+}
+
+export async function deleteManagementKey(): Promise<
+  ApiResponse<ManagementKeyStatus>
+> {
+  const res = await api.delete('/api/token/management-key')
   return res.data
 }

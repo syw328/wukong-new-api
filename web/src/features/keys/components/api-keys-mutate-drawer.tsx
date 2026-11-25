@@ -784,6 +784,30 @@ export function ApiKeysMutateDrawer({
                         </FormItem>
                       )}
                     />
+                    <FormField
+                      control={form.control}
+                      name='allow_api_edit'
+                      render={({ field }) => (
+                        <FormItem className={sideDrawerSwitchItemClassName()}>
+                          <div className='flex flex-col gap-0.5'>
+                            <FormLabel className='text-sm'>
+                              {t('Allow config changes via API')}
+                            </FormLabel>
+                            <FormDescription className='text-xs'>
+                              {t(
+                                'With this on, the key can rename itself, change its routing or disable itself through POST /v1/key. Quota and IP whitelist stay console-only.'
+                              )}
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
                   </div>
                 </CollapsibleContent>
               </SideDrawerSection>

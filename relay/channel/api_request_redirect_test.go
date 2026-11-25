@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -85,4 +86,48 @@ func TestDoRequestReturnsUpstreamRedirectWithoutFollowing(t *testing.T) {
 	}
 
 	assert.Equal(t, originalRedirectPolicy, reflect.ValueOf(sharedClient.CheckRedirect).Pointer(), "the cached client must not be mutated")
+}
+
+func TestDoRequestPassesOnlyThePlatformTaskIdToTheClient(t *testing.T) {
+	service.InitHttpClient()
+	gin.SetMode(gin.TestMode)
+	taskID := "apicall_20261125_fixture"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("X-Task-Id", taskID)
+		w.Header().Set("X-Internal-Upstream", "must-not-leak")
+		_, _ = io.WriteString(w, `{}`)
+	}))
+	defer upstream.Close()
+	resetRelayConfig := func() {
+		platformRelayOnce = sync.Once{}
+		platformRelayCfg = nil
+	}
+	t.Cleanup(resetRelayConfig)
+	t.Setenv("PLATFORM_RELAY_SECRET", "relay-task-id-fixture-secret-0123456789")
+	t.Setenv("PLATFORM_RELAY_CHANNEL_IDS", "7")
+	for _, item := range []struct {
+		name      string
+		channelID int
+		upstream  string
+		want      string
+	}{
+		{"platform channel", 7, "apicall_20261125_fixture", "apicall_20261125_fixture"},
+		{"platform channel with a malformed id", 7, "apicall 1", ""},
+		{"other channel", 8, "apicall_20261125_fixture", ""},
+	} {
+		t.Run(item.name, func(t *testing.T) {
+			resetRelayConfig()
+			taskID = item.upstream
+			recorder := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(recorder)
+			ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+			req, err := http.NewRequest(http.MethodPost, upstream.URL, bytes.NewReader([]byte(`{}`)))
+			require.NoError(t, err)
+			resp, err := doRequest(ctx, req, &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{ChannelId: item.channelID}})
+			require.NoError(t, err)
+			defer resp.Body.Close()
+			assert.Equal(t, item.want, ctx.Writer.Header().Get("X-Task-Id"))
+			assert.Empty(t, ctx.Writer.Header().Get("X-Internal-Upstream"))
+		})
+	}
 }

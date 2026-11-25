@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,6 +31,10 @@ import (
 //
 // 用户没有对应 OAuth 绑定（例如 root 管理员本地账号）时不注入用户头，平台会按服务
 // Key 本身的账号处理。
+
+// platformTaskID matches the task IDs GET /v1/usage/{task_id} accepts on the
+// platform (server/public-api/publicApiUsage.js TASK_ID_RE).
+var platformTaskID = regexp.MustCompile(`^[A-Za-z0-9_.:-]{1,160}$`)
 
 const (
 	platformRelaySecretHeader = "X-Platform-Relay-Secret"

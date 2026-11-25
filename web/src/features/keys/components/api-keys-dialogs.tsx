@@ -23,6 +23,7 @@ import { ApiKeysDeleteDialog } from './api-keys-delete-dialog'
 import { ApiKeysMutateDrawer } from './api-keys-mutate-drawer'
 import { useApiKeys } from './api-keys-provider'
 import { CCSwitchDialog } from './dialogs/cc-switch-dialog'
+import { ManagementKeyDialog } from './dialogs/management-key-dialog'
 
 export function ApiKeysDialogs(props: {
   // From a model price page link; opens the create drawer once with it.
@@ -61,6 +62,10 @@ export function ApiKeysDialogs(props: {
         onOpenChange={(isOpen) => !isOpen && setOpen(null)}
         tokenKey={resolvedKey}
         tokenId={currentRow?.id ?? 0}
+      />
+      <ManagementKeyDialog
+        open={open === 'management-key'}
+        onOpenChange={(isOpen) => !isOpen && setOpen(null)}
       />
     </>
   )

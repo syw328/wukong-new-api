@@ -455,6 +455,8 @@ const AUDIT_TEMPLATES: Record<string, string> = {
   'token.key_view_batch': 'API token batch key access',
   'access_token.generate': 'Generated a system access token',
   'access_token.revoke': 'Revoked the system access token',
+  'management_key.generate': 'Generated or reset the API management key',
+  'management_key.revoke': 'Turned off the API management key',
   'user.2fa_setup': 'Started two-factor authentication setup',
   'user.2fa_enable': 'Enabled two-factor authentication',
   'user.2fa_disable_self': 'Disabled two-factor authentication',

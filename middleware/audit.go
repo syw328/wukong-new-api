@@ -3,6 +3,7 @@ package middleware
 import (
 	"bytes"
 	"strconv"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -226,6 +227,17 @@ func TokenOperationAudit() gin.HandlerFunc {
 			action, content = "token.key_view", "API token key access"
 		case "POST /api/token/batch/keys":
 			action, content = "token.key_view_batch", "API token batch key access"
+		case "POST /api/token/management-key":
+			action, content = "management_key.generate", "API management key generation"
+		case "DELETE /api/token/management-key":
+			action, content = "management_key.revoke", "API management key revocation"
+		// The same token events through the API: the management key, or a key editing itself.
+		case "POST /v1/keys":
+			action, content = "token.create", "API token creation"
+		case "POST /v1/keys/:id", "POST /v1/key":
+			action, content = "token.update", "API token configuration update"
+		case "DELETE /v1/keys/:id":
+			action, content = "token.delete", "API token deletion"
 		default:
 			c.Next()
 			return
@@ -240,6 +252,17 @@ func TokenOperationAudit() gin.HandlerFunc {
 			UserId: c.GetInt("id"), Username: c.GetString("username"), ActorRole: c.GetInt("role"),
 			Category: model.AuditCategorySecurity, Action: action, Content: content,
 			Other: model.AuditOther{Op: &model.AuditOperation{Action: action, Params: params}},
+		}
+		if strings.HasPrefix(c.FullPath(), "/v1/") {
+			entry.AuthMethod, entry.TokenRef = "management_key", c.GetString("management_key_ref")
+			if c.FullPath() == "/v1/key" {
+				entry.AuthMethod, entry.TokenRef = "api_key", ""
+			}
+			if entry.ActorRole == 0 {
+				if user, err := model.GetUserCache(entry.UserId); err == nil {
+					entry.Username, entry.ActorRole = user.Username, user.Role
+				}
+			}
 		}
 		writer := &auditResponseWriter{ResponseWriter: c.Writer, body: bytes.NewBuffer(nil), maxSize: 64 * 1024}
 		c.Writer = writer

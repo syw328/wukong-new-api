@@ -370,6 +370,11 @@ describe('overview setup guide', () => {
     expect(
       within(card).getByText(`${base}/v1beta/models/{model}:generateContent`)
     ).toBeVisible()
+    const skill = within(card).getByRole('button', {
+      name: 'Download SKILL.md',
+    })
+    expect(skill).toHaveAttribute('href', `${base}/v1/skills/SKILL.md`)
+    expect(skill).toHaveAttribute('download', 'SKILL.md')
     await waitFor(() => expect(card).toHaveTextContent('"model":"plain-chat"'))
     expect(card).toHaveTextContent('ANTHROPIC_MODEL="claude-chat"')
     expect(card).toHaveTextContent('sk-masked')

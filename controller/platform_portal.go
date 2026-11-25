@@ -1,5 +1,5 @@
 // Copyright (C) 2026 QuantumNous and contributors. Licensed under AGPL-3.0-or-later.
-// Modified for tenant-scoped catalog, account prices, media quotes and platform JSON relays.
+// Modified for tenant-scoped catalog, account prices, media quotes, platform JSON relays and the skills file.
 package controller
 
 import (
@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"time"
@@ -173,6 +174,44 @@ func PostPlatformRecharge(c *gin.Context) {
 }
 func GetPlatformRecharge(c *gin.Context) {
 	proxyPlatformPortal(c, "/api/developer/relay-recharge/orders/"+url.PathEscape(c.Param("order_id")), true, false)
+}
+func GetPlatformRechargeOptions(c *gin.Context) {
+	proxyPlatformPortal(c, "/api/developer/relay-recharge/options", true, false)
+}
+
+// GetPlatformSkills relays GET /v1/skills and /v1/skills/SKILL.md, which need
+// no key: no identity, cookie or key is sent, and only a JSON or Markdown body
+// comes back.
+func GetPlatformSkills(c *gin.Context) {
+	origin, ok := common.PlatformPortalOrigin(c.Request)
+	if !ok {
+		abortPlatformRelay(c, http.StatusServiceUnavailable, "platform_unavailable", "Platform gateway is not configured")
+		return
+	}
+	request, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, origin+c.FullPath(), nil)
+	if err != nil {
+		abortPlatformRelay(c, http.StatusServiceUnavailable, "platform_unavailable", "Platform request is unavailable")
+		return
+	}
+	response, err := platformPortalClient.Do(request)
+	if err != nil {
+		platformReadError(c, err)
+		return
+	}
+	defer response.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(response.Body, (2<<20)+1))
+	contentType := response.Header.Get("Content-Type")
+	mediaType, _, _ := mime.ParseMediaType(contentType)
+	if err != nil || len(data) > 2<<20 || (response.StatusCode >= 300 && response.StatusCode < 400) ||
+		(mediaType != "application/json" && mediaType != "text/markdown") {
+		abortPlatformRelay(c, http.StatusBadGateway, "platform_response_invalid", "Invalid platform response")
+		return
+	}
+	if cache := response.Header.Get("Cache-Control"); cache != "" {
+		c.Header("Cache-Control", cache)
+	}
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Data(response.StatusCode, contentType, data)
 }
 
 func platformPortalServiceKey() (string, error) {

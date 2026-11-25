@@ -561,6 +561,11 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	if upID := resp.Header.Get(common2.RequestIdKey); upID != "" {
 		c.Set(common2.UpstreamRequestIdKey, upID)
 	}
+	// The platform names each chat, Responses or Messages call in X-Task-Id for
+	// GET /v1/usage/{task_id}; it is the one platform header passed on here.
+	if taskID := resp.Header.Get("X-Task-Id"); PlatformRelayChannel(info) && platformTaskID.MatchString(taskID) {
+		c.Writer.Header().Set("X-Task-Id", taskID)
+	}
 
 	_ = req.Body.Close()
 	_ = c.Request.Body.Close()

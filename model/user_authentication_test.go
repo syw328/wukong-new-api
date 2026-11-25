@@ -92,6 +92,8 @@ func TestHardDeleteUserPublishesTombstoneAndPurgesAuthenticationData(t *testing.
 	require.NoError(t, DB.Create(&TwoFABackupCode{UserId: user.Id, CodeHash: "hash"}).Error)
 	require.NoError(t, DB.Create(&PasskeyCredential{UserID: user.Id, CredentialID: "credential-success", PublicKey: "public-key"}).Error)
 	require.NoError(t, DB.Create(&UserOAuthBinding{UserId: user.Id, ProviderId: 1, ProviderUserId: "provider-user-success"}).Error)
+	_, _, err := RotateManagementKey(user.Id)
+	require.NoError(t, err)
 	require.NoError(t, DB.Create(&UserSession{
 		SID: "hard-delete-success-session", UserID: user.Id, Version: 1, UserAuthVersion: 1,
 		Status: UserSessionStatusActive, RefreshHash: "refresh-hash", LoginMethod: "password",
@@ -117,6 +119,7 @@ func TestHardDeleteUserPublishesTombstoneAndPurgesAuthenticationData(t *testing.
 		&TwoFABackupCode{},
 		&PasskeyCredential{},
 		&UserOAuthBinding{},
+		&ManagementKey{},
 		&UserSession{},
 		&AuthFlow{},
 		&ExternalIdentityClaim{},

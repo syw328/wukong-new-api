@@ -347,6 +347,26 @@ describe('API keys mutate drawer Auto group integration', () => {
   })
 })
 
+test('API config edits stay off for a new key until the owner turns them on', async () => {
+  const payloads: Array<Record<string, unknown>> = []
+  installApiFixtures(payloads)
+  await renderCreateDrawer()
+  changeInput(getControlByLabel('Name'), 'locked-key')
+  fireEvent.click(findButton('Save changes', true))
+  await waitFor(() => expect(payloads).toHaveLength(1))
+  expect(payloads[0]?.allow_api_edit).toBe(false)
+
+  fireEvent.click(screen.getByRole('button', { name: /Advanced Settings/ }))
+  const toggle = await screen.findByRole('switch', {
+    name: 'Allow config changes via API',
+  })
+  expect(toggle).toHaveAttribute('aria-checked', 'false')
+  fireEvent.click(toggle)
+  fireEvent.click(findButton('Save changes', true))
+  await waitFor(() => expect(payloads).toHaveLength(2))
+  expect(payloads[1]?.allow_api_edit).toBe(true)
+})
+
 test('custom routing cancellation does not change the key draft', async () => {
   const payloads: Array<Record<string, unknown>> = []
   installApiFixtures(payloads)

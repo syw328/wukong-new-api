@@ -409,6 +409,9 @@ export function buildAuditDetails(entry: AuditLog, t: TFunction) {
   let authentication = authMethod
   if (authMethod === 'session') authentication = t('Session')
   else if (authMethod === 'access_token') authentication = t('Access Token')
+  else if (authMethod === 'management_key') {
+    authentication = t('API management key')
+  } else if (authMethod === 'api_key') authentication = t('API key')
   else if (authMethod) authentication = loginMethodLabel(authMethod, t)
 
   let targetName = ''

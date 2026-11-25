@@ -51,6 +51,21 @@ func TestPlatformMediaNativeProtocol(t *testing.T) {
 		assert.Equal(t, longToken, decode(submit["body"])["authorization_token"])
 		assert.Equal(t, 0.4, invoke("extractUsage", ctx)["platform_credits"])
 	})
+	t.Run("passes the caller's notify_url to the platform without touching the quote", func(t *testing.T) {
+		request["notify_url"] = "https://hooks.example.com/media?token=abc"
+		defer delete(request, "notify_url")
+		body := decode(invoke("buildSubmitRequest", ctx)["body"])
+		assert.Equal(t, "https://hooks.example.com/media?token=abc", body["notify_url"])
+		assert.Equal(t, 0.4, body["authorization_max"])
+		assert.Equal(t, "signed-test-token", body["authorization_token"])
+		assert.Equal(t, 0.4, invoke("extractUsage", ctx)["platform_credits"])
+	})
+	t.Run("still requires the full quote, which pre-charges the portal quota mirror", func(t *testing.T) {
+		unquoted := map[string]any{"baseUrl": "https://platform.test", "requestBody": map[string]any{"model": "image-test", "prompt": "test",
+			"notify_url": "https://hooks.example.com/media"}}
+		_, callErr := plugin.Engine.Call(t.Context(), "buildSubmitRequest", unquoted)
+		require.ErrorContains(t, callErr, "confirmed_quote_required")
+	})
 	t.Run("requires quote and rejects malformed bounds before the relay", func(t *testing.T) {
 		for _, cap := range []any{0, -1, 1000001, "0.4", nil} {
 			bad := map[string]any{"baseUrl": "https://platform.test", "requestBody": map[string]any{"model": "image-test", "authorization_max": cap}}

@@ -109,6 +109,15 @@ it('uses the returned authentication method for personal access records', async 
 })
 
 it.each([
+  ['management_key', 'API management key'],
+  ['api_key', 'API key'],
+])('names key changes made through the API by %s', async (method, label) => {
+  const { dialog } = await openDetails({ ...entry, auth_method: method })
+  expect(within(dialog).getByText(label)).toBeVisible()
+  expect(within(dialog).queryByText('Session')).not.toBeInTheDocument()
+})
+
+it.each([
   ['token.create', '创建 API 令牌「1」（ID: 11）'],
   ['token.update', '更新 API 令牌「1」（ID: 11）'],
   ['token.status_update', '更新 API 令牌「1」（ID: 11）'],

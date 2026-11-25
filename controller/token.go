@@ -356,6 +356,7 @@ func AddToken(c *gin.Context) {
 		CrossGroupRetry:    token.CrossGroupRetry,
 		AutoGroups:         token.AutoGroups,
 		RoutingPolicy:      token.RoutingPolicy,
+		AllowApiEdit:       token.AllowApiEdit,
 	}
 	err = cleanToken.Insert()
 	if err != nil {
@@ -451,6 +452,7 @@ func UpdateToken(c *gin.Context) {
 		cleanToken.AllowIps = token.AllowIps
 		cleanToken.Group = token.Group
 		cleanToken.CrossGroupRetry = token.CrossGroupRetry
+		cleanToken.AllowApiEdit = token.AllowApiEdit
 		if request.RoutingPolicy != nil {
 			if err := cleanToken.SetRoutingPolicy(request.RoutingPolicy); err != nil {
 				common.ApiError(c, err)
@@ -511,6 +513,7 @@ func UpdateToken(c *gin.Context) {
 			{"cross_group_retry", previous.CrossGroupRetry != cleanToken.CrossGroupRetry},
 			{"auto_groups", previous.AutoGroups != cleanToken.AutoGroups},
 			{"routing_policy", previous.RoutingPolicy != cleanToken.RoutingPolicy},
+			{"allow_api_edit", previous.AllowApiEdit != cleanToken.AllowApiEdit},
 		} {
 			if field.changed {
 				changedFields = append(changedFields, field.name)
