@@ -3,7 +3,7 @@ import type { PlatformModel } from '@/features/platform-models/types'
 import { getPricing } from '@/features/pricing/api'
 import { api } from '@/lib/api'
 import {
-  portalApiOrigin,
+  portalPublicApiOrigin,
   portalRequestPath,
   portalRuntime,
 } from '@/lib/portal-runtime'
@@ -14,7 +14,7 @@ export type CCSwitchApp = 'claude' | 'codex' | 'gemini'
 export type CCSwitchModel = { id: string; apps: string[] }
 
 export function ccSwitchServerAddress(): string {
-  if (portalRuntime().basePath) return portalApiOrigin()
+  if (portalRuntime().basePath) return portalPublicApiOrigin()
   const configured = readCachedStatus()?.server_address
   const address =
     typeof configured === 'string' && configured.trim()

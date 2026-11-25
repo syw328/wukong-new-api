@@ -5872,6 +5872,7 @@
     "The following models in the model redirect have not been added to the \"Models\" list and may fail during invocation due to missing available models:": "Các mô hình sau trong chuyển hướng mô hình chưa được thêm vào danh sách \"Mô hình\" và có thể gọi thất bại do thiếu các mô hình có sẵn:",
     "The gateway rejected this plugin": "Cổng đã từ chối plugin này",
     "The index could not be fetched or parsed: {{message}}. The host may block cross-origin requests.": "Không thể tải hoặc phân tích chỉ mục: {{message}}. Máy chủ có thể chặn yêu cầu cross-origin.",
+    "The legacy address {{path}} still works.": "Địa chỉ cũ {{path}} vẫn dùng được.",
     "The login session that started this Telegram binding is no longer valid.": "Phiên đăng nhập đã bắt đầu liên kết Telegram này không còn hợp lệ.",
     "The mapped upstream model(s)": "Mô hình(s) thượng nguồn được ánh xạ",
     "The model routing configuration could not be verified.": "Không thể xác minh cấu hình định tuyến mô hình.",

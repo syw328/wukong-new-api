@@ -361,8 +361,11 @@ describe('overview setup guide', () => {
     const card = await screen.findByRole('region', {
       name: 'Connection details',
     })
-    const base = `${window.location.origin}/api/open-platform`
+    // Customers get the unified site address, not the portal transport path.
+    const base = window.location.origin
     expect(within(card).getByText(`${base}/v1`)).toBeVisible()
+    expect(card).not.toHaveTextContent('/api/open-platform')
+    expect(card).toHaveTextContent(`ANTHROPIC_BASE_URL="${base}"`)
     expect(within(card).getByText(`${base}/v1/messages`)).toBeVisible()
     expect(
       within(card).getByText(`${base}/v1beta/models/{model}:generateContent`)

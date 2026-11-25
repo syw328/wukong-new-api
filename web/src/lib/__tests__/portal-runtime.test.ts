@@ -4,6 +4,7 @@ import { initializeFrontendCache } from '@/lib/frontend-cache'
 import { buildOAuthAuthorizationUrl } from '@/lib/oauth'
 import {
   portalApiOrigin,
+  portalPublicApiOrigin,
   portalLocalStorage,
   portalPagePath,
   portalRequestPath,
@@ -75,6 +76,14 @@ describe('mounted portal paths and storage', () => {
       `${window.location.origin}/api/open-platform`
     )
     expect(portalPagePath('https://other.test')).toBe('https://other.test')
+  })
+
+  it('customers are shown the unified site address while portal requests keep the transport prefix', () => {
+    mountedPortal()
+    expect(portalPublicApiOrigin()).toBe(window.location.origin)
+    expect(portalApiOrigin()).toBe(
+      `${window.location.origin}/api/open-platform`
+    )
   })
 
   it('cache upgrades preserve the original site settings and credentials', () => {

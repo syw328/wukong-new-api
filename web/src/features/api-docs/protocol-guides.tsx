@@ -5,7 +5,7 @@ import { CopyButton } from '@/components/copy-button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { PlatformModel } from '@/features/platform-models/types'
-import { portalApiOrigin } from '@/lib/portal-runtime'
+import { portalPublicApiOrigin } from '@/lib/portal-runtime'
 
 import { protocolDocument, protocolGuides } from './protocols'
 
@@ -49,7 +49,7 @@ function EndpointList(props: { endpoints: Array<[string, string, string]> }) {
 // copies as one document so it can be pasted into an integration ticket.
 export function ProtocolGuides(props: { models: PlatformModel[] }) {
   const { t } = useTranslation()
-  const guides = protocolGuides(portalApiOrigin(), props.models)
+  const guides = protocolGuides(portalPublicApiOrigin(), props.models)
   return (
     <section className='space-y-4' aria-label={t('Supported protocols')}>
       <h2 className='text-xl font-semibold'>{t('Supported protocols')}</h2>

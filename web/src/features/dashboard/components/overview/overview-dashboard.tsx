@@ -58,7 +58,7 @@ import { handleServerError } from '@/lib/handle-server-error'
 import { MOTION_TRANSITION } from '@/lib/motion'
 import {
   portalLocalStorage,
-  portalApiOrigin,
+  portalPublicApiOrigin,
   portalRuntime,
 } from '@/lib/portal-runtime'
 import { ROLE } from '@/lib/roles'
@@ -154,7 +154,7 @@ function saveSetupGuideExpanded(expanded: boolean): void {
 
 function getCurrentOrigin(): string {
   if (typeof window === 'undefined') return ''
-  return portalApiOrigin()
+  return portalPublicApiOrigin()
 }
 
 function normalizeEndpoint(sourceUrl?: string): string {

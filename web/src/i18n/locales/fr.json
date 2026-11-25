@@ -5872,6 +5872,7 @@
     "The following models in the model redirect have not been added to the \"Models\" list and may fail during invocation due to missing available models:": "Les modèles suivants dans la redirection du modèle n'ont pas été ajoutés à la liste \"Modèles\" et peuvent échouer lors de l'invocation en raison de modèles disponibles manquants :",
     "The gateway rejected this plugin": "La passerelle a rejeté ce plugin",
     "The index could not be fetched or parsed: {{message}}. The host may block cross-origin requests.": "Impossible de récupérer ou d’analyser l’index : {{message}}. L’hôte bloque peut-être les requêtes cross-origin.",
+    "The legacy address {{path}} still works.": "L’ancienne adresse {{path}} fonctionne toujours.",
     "The login session that started this Telegram binding is no longer valid.": "La session de connexion ayant lancé cette liaison Telegram n’est plus valide.",
     "The mapped upstream model(s)": "Le(s) modèle(s) amont mappé(s)",
     "The model routing configuration could not be verified.": "La configuration du routage du modèle n’a pas pu être vérifiée.",

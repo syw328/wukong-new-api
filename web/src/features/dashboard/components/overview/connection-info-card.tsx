@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { CopyButton } from '@/components/copy-button'
 import { Button } from '@/components/ui/button'
 import { IconBadge } from '@/components/ui/icon-badge'
-import { portalApiOrigin } from '@/lib/portal-runtime'
+import { portalPublicApiOrigin } from '@/lib/portal-runtime'
 
 import { useRealKeyCopy } from '../../hooks/use-real-key-copy'
 import { buildCurlCommand } from '../../lib/connection'
@@ -26,7 +26,7 @@ export function ConnectionInfoCard(props: {
 }) {
   const { t } = useTranslation()
   const { copy, copying } = useRealKeyCopy(props.keyId)
-  const origin = portalApiOrigin()
+  const origin = portalPublicApiOrigin()
   const base = `${origin}/v1`
   const endpoints: Array<[string, string]> = [
     ['OpenAI Chat Completions', `${base}/chat/completions`],

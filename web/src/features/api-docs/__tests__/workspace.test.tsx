@@ -131,12 +131,40 @@ it('the shared balance guide copies the current site request and explains credit
   ).toBeVisible()
   await user.click(screen.getByRole('button', { name: 'Copy balance request' }))
   expect(await navigator.clipboard.readText()).toContain(
-    `${window.location.origin}/api/open-platform/v1/balance`
+    `"${window.location.origin}/v1/balance"`
   )
   expect(await navigator.clipboard.readText()).toContain(
     'Authorization: Bearer $PLATFORM_API_KEY'
   )
   expect(screen.getByText(/"unit": "credits"/)).toBeVisible()
+})
+
+it('a mounted portal recommends the unified site Base URL and notes the legacy portal address still works', async () => {
+  const user = userEvent.setup()
+  const runtime = document.createElement('script')
+  runtime.id = 'platform-portal-runtime'
+  runtime.type = 'application/json'
+  runtime.textContent = JSON.stringify({
+    origin: window.location.origin,
+    basePath: '/api',
+    transportPath: '/api/open-platform',
+  })
+  document.body.append(runtime)
+  setup()
+  await user.click(screen.getByRole('button', { name: 'Copy Base URL' }))
+  expect(await navigator.clipboard.readText()).toBe(
+    `${window.location.origin}/v1`
+  )
+  expect(
+    screen.getByText('The legacy address /api/open-platform/v1 still works.')
+  ).toBeVisible()
+})
+
+it('a standalone New API shows no legacy portal address note', () => {
+  setup()
+  expect(
+    screen.queryByText(/The legacy address .* still works\./)
+  ).not.toBeInTheDocument()
 })
 
 it('an unknown deep link shows an unavailable document instead of silently selecting another model', () => {
@@ -231,7 +259,7 @@ it('upload and voice cloning guides copy portal requests with the fields the pla
   })
   document.body.append(runtime)
   setup()
-  const base = `${window.location.origin}/api/open-platform/v1`
+  const base = `${window.location.origin}/v1`
   const uploads = screen.getByRole('region', { name: 'Upload reference media' })
   expect(within(uploads).getByText(`${base}/uploads/videos`)).toBeVisible()
   await user.click(

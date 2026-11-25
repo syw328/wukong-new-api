@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { PlatformModel } from '@/features/platform-models/types'
-import { portalApiOrigin } from '@/lib/portal-runtime'
+import { portalPublicApiOrigin } from '@/lib/portal-runtime'
 
 import { NativeReference } from './native-reference'
 import { ProtocolGuides } from './protocol-guides'
@@ -36,7 +36,7 @@ export function ProtocolReference(props: {
   models?: PlatformModel[]
 }) {
   const { t } = useTranslation()
-  const base = `${portalApiOrigin()}/v1`
+  const base = `${portalPublicApiOrigin()}/v1`
   const discovery = `curl --fail-with-body "${base}/models" \\\n  -H "Authorization: Bearer $PLATFORM_API_KEY"`
   return (
     <div className='mt-8 space-y-8'>

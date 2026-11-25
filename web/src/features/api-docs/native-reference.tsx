@@ -2,7 +2,7 @@
 import { useTranslation } from 'react-i18next'
 
 import { CopyButton } from '@/components/copy-button'
-import { portalApiOrigin } from '@/lib/portal-runtime'
+import { portalPublicApiOrigin } from '@/lib/portal-runtime'
 
 import {
   uploadEndpoints,
@@ -22,7 +22,7 @@ import {
 // component size guideline; both sections only render on the quick start.
 export function NativeReference() {
   const { t } = useTranslation()
-  const base = `${portalApiOrigin()}/v1`
+  const base = `${portalPublicApiOrigin()}/v1`
   const sections = [
     {
       title: 'Upload reference media',

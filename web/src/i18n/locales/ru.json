@@ -5872,6 +5872,7 @@
     "The following models in the model redirect have not been added to the \"Models\" list and may fail during invocation due to missing available models:": "Следующие модели в перенаправлении модели не были добавлены в список \"Модели\" и могут не работать при вызове из-за отсутствия доступных моделей:",
     "The gateway rejected this plugin": "Шлюз отклонил этот плагин",
     "The index could not be fetched or parsed: {{message}}. The host may block cross-origin requests.": "Не удалось загрузить или разобрать индекс: {{message}}. Хост может блокировать кросс-доменные запросы.",
+    "The legacy address {{path}} still works.": "Старый адрес {{path}} по-прежнему работает.",
     "The login session that started this Telegram binding is no longer valid.": "Сеанс входа, из которого была начата привязка Telegram, больше недействителен.",
     "The mapped upstream model(s)": "Сопоставленные upstream модель(и)",
     "The model routing configuration could not be verified.": "Не удалось проверить настройки маршрутизации модели.",

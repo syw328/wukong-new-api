@@ -20,7 +20,11 @@ import {
   TYPE_LABELS,
   type ModelCategory,
 } from '@/features/platform-models/types'
-import { portalApiOrigin, portalPagePath } from '@/lib/portal-runtime'
+import {
+  portalPagePath,
+  portalPublicApiOrigin,
+  portalRuntime,
+} from '@/lib/portal-runtime'
 
 import { ProtocolReference } from './protocol-reference'
 
@@ -36,7 +40,8 @@ export function DocsWorkspace(props: {
   const models = query.data || []
   const model = models.find((item) => item.id === props.modelId)
   const visible = filterPlatformModels(models, category, search)
-  const base = `${portalApiOrigin()}/v1`
+  const base = `${portalPublicApiOrigin()}/v1`
+  const legacyBase = portalRuntime().transportPath
   const select = (id: string) => {
     props.onSelect(id)
     setCatalogOpen(false)
@@ -49,10 +54,19 @@ export function DocsWorkspace(props: {
           <strong>{t('API documentation')}</strong>
           <Badge variant='outline'>v1</Badge>
         </div>
-        <div className='api-docs-base'>
+        <div className='api-docs-base flex-wrap'>
           <span>BASE URL</span>
           <code>{base}</code>
           <CopyButton value={base} aria-label={t('Copy Base URL')} size='sm' />
+          {legacyBase && (
+            <p className='text-muted-foreground w-full text-right text-xs max-md:text-left'>
+              {t('The legacy address {{path}} still works.', {
+                path: `${legacyBase}/v1`,
+                // React escapes the text; keep the path's slashes literal.
+                interpolation: { escapeValue: false },
+              })}
+            </p>
+          )}
         </div>
         <Button
           variant='outline'

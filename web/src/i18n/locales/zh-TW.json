@@ -5872,6 +5872,7 @@
     "The following models in the model redirect have not been added to the \"Models\" list and may fail during invocation due to missing available models:": "模型重新導向裡的下列模型尚未新增到「模型」列表，呼叫時會因為缺少可用模型而失敗：",
     "The gateway rejected this plugin": "閘道拒絕了該外掛",
     "The index could not be fetched or parsed: {{message}}. The host may block cross-origin requests.": "索引無法取得或解析：{{message}}。該主機可能禁止跨來源請求。",
+    "The legacy address {{path}} still works.": "舊位址 {{path}} 仍可使用。",
     "The login session that started this Telegram binding is no longer valid.": "發起此 Telegram 綁定的登入工作階段已失效。",
     "The mapped upstream model(s)": "映射的上游模型",
     "The model routing configuration could not be verified.": "無法驗證模型路由設定。",

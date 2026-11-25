@@ -14,7 +14,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ProtocolReference } from '@/features/api-docs/protocol-reference'
 import { modelDocument } from '@/features/api-docs/reference'
-import { portalApiOrigin } from '@/lib/portal-runtime'
+import { portalPublicApiOrigin } from '@/lib/portal-runtime'
 
 import { usePlatformPrices } from './api'
 import { MediaRouteSelector } from './media-route-selector'
@@ -35,7 +35,7 @@ export function ModelApi(props: {
   documentMode?: boolean
 }) {
   const { t } = useTranslation()
-  const root = portalApiOrigin()
+  const root = portalPublicApiOrigin()
   const [routeId, setRouteId] = useState('')
   const prices = usePlatformPrices(
     props.model.type !== 'chat' && props.model.category !== 'tool'

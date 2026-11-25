@@ -33,7 +33,8 @@ const models: PlatformModel[] = [
     endpoint: '/v1/media/generations',
   },
 ]
-const origin = `${window.location.origin}/api/open-platform`
+// Customers use the unified site address; the site forwards portal keys.
+const origin = window.location.origin
 
 beforeEach(() => {
   const runtime = document.createElement('script')

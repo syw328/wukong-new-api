@@ -107,6 +107,17 @@ export function portalApiOrigin(): string {
   return `${runtime.origin}${runtime.transportPath}`
 }
 
+/**
+ * Display only: the address customers paste into SDKs and tools. The site
+ * forwards `<origin>/v1/*` and `/v1beta/*` calls made with portal keys to this
+ * tenant's portal, so the unified `<origin>/v1` is the recommended Base URL.
+ * The legacy `/api/open-platform/v1` keeps working. Portal-internal requests
+ * keep `portalApiOrigin()` / `portalRequestPath()`.
+ */
+export function portalPublicApiOrigin(): string {
+  return portalRuntime().origin
+}
+
 export function portalStorageKey(key: string): string {
   return portalRuntime().basePath ? `newapi:portal:${key}` : key
 }

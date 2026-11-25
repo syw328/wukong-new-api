@@ -123,9 +123,7 @@ it('mounted import ignores stale server addresses and preserves the full key', a
   await user.click(await screen.findByRole('option', { name: 'gpt-6-astra' }))
   await user.click(screen.getByRole('button', { name: 'Open CC Switch' }))
   const url = new URL(vi.mocked(window.open).mock.calls[0][0] as string)
-  expect(url.searchParams.get('endpoint')).toBe(
-    `${window.location.origin}/api/open-platform/v1`
-  )
+  expect(url.searchParams.get('endpoint')).toBe(`${window.location.origin}/v1`)
   expect(url.searchParams.get('apiKey')).toBe(key)
   expect(url.searchParams.get('model')).toBe('gpt-6-astra')
 })
@@ -155,7 +153,7 @@ it('loading the key model list cannot export an unchecked configuration', async 
 })
 
 it.each(['Claude', 'Gemini'])(
-  '%s import preserves the portal prefix without an extra /v1',
+  '%s import uses the unified site address without an extra /v1',
   async (app) => {
     const user = show()
     await user.click(screen.getByRole('radio', { name: app }))
@@ -168,9 +166,7 @@ it.each(['Claude', 'Gemini'])(
     )
     await user.click(screen.getByRole('button', { name: 'Open CC Switch' }))
     const url = new URL(vi.mocked(window.open).mock.calls[0][0] as string)
-    expect(url.searchParams.get('endpoint')).toBe(
-      `${window.location.origin}/api/open-platform`
-    )
+    expect(url.searchParams.get('endpoint')).toBe(window.location.origin)
     expect(url.searchParams.get('app')).toBe(app.toLowerCase())
   }
 )
