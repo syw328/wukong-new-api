@@ -77,9 +77,11 @@ import {
 } from '../api'
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants'
 import {
+  applyKeyRoutePreset,
   getApiKeyFormSchema,
   type ApiKeyFormValues,
   getApiKeyFormDefaultValues,
+  type KeyRoutePreset,
   transformFormDataToPayload,
   transformApiKeyToFormDefaults,
 } from '../lib'
@@ -96,12 +98,15 @@ type ApiKeyMutateDrawerProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   currentRow?: ApiKey
+  // Create only: start from one model sent through one exact route.
+  routePreset?: KeyRoutePreset
 }
 
 export function ApiKeysMutateDrawer({
   open,
   onOpenChange,
   currentRow,
+  routePreset,
 }: ApiKeyMutateDrawerProps) {
   const { t } = useTranslation()
   const isUpdate = !!currentRow
@@ -206,6 +211,14 @@ export function ApiKeysMutateDrawer({
     ),
   })
 
+  // A route preset only applies where the platform enforces key routing.
+  const presetModel = platformRouting ? routePreset?.model : undefined
+  const presetRouteId = platformRouting ? routePreset?.routeId : undefined
+  const createTarget =
+    presetModel && presetRouteId
+      ? `create:${presetModel}:${presetRouteId}`
+      : 'create'
+
   // Load existing data when updating
   useEffect(() => {
     if (!open) {
@@ -223,7 +236,8 @@ export function ApiKeysMutateDrawer({
     if (isUpdate && (!apiKeyFetched || apiKeyFetching)) return
     if (!isUpdate && statusLoading) return
 
-    const target = isUpdate && currentRow ? `update:${currentRow.id}` : 'create'
+    const target =
+      isUpdate && currentRow ? `update:${currentRow.id}` : createTarget
     if (initializedTarget === target) return
     if (isUpdate && currentRow) {
       if (apiKeyData?.success && apiKeyData.data) {
@@ -237,11 +251,17 @@ export function ApiKeysMutateDrawer({
         setInitializedTarget(target)
       }
     } else {
+      const defaults = getApiKeyFormDefaultValues(
+        defaultUseAutoGroup && backendHasAuto,
+        platformRouting
+      )
       form.reset(
-        getApiKeyFormDefaultValues(
-          defaultUseAutoGroup && backendHasAuto,
-          platformRouting
-        )
+        presetModel && presetRouteId
+          ? applyKeyRoutePreset(defaults, {
+              model: presetModel,
+              routeId: presetRouteId,
+            })
+          : defaults
       )
       setInitializedTarget(target)
     }
@@ -252,6 +272,9 @@ export function ApiKeysMutateDrawer({
     form,
     defaultUseAutoGroup,
     platformRouting,
+    createTarget,
+    presetModel,
+    presetRouteId,
     statusLoading,
     backendHasAuto,
     groupsFetched,
@@ -267,7 +290,7 @@ export function ApiKeysMutateDrawer({
   ])
 
   const formTarget =
-    isUpdate && currentRow ? `update:${currentRow.id}` : 'create'
+    isUpdate && currentRow ? `update:${currentRow.id}` : createTarget
   const isFormInitialized = initializedTarget === formTarget
   const selectedGroup = form.watch('group')
 

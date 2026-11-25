@@ -1,5 +1,6 @@
 // Copyright (C) 2026 QuantumNous and contributors. AGPL-3.0-or-later.
-import { ChevronDown, RefreshCw } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
+import { ChevronDown, KeyRound, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -30,6 +31,7 @@ import {
   TableBody,
   TableCell,
 } from '@/components/ui/table'
+import { useStatus } from '@/hooks/use-status'
 
 import { usePlatformPrices } from './api'
 import { formatPriceBookDate, routePriceOrder } from './helpers'
@@ -135,11 +137,38 @@ function PriceControl(props: {
     </div>
   )
 }
+// Opens the console's new-key drawer with a custom route rule for exactly
+// this model and route. Hidden where the platform does not enforce key routing.
+function RouteKeyLink(props: { model: string; routeId: string }) {
+  const { t } = useTranslation()
+  const { status } = useStatus()
+  if (status?.platform_key_routing !== true) return null
+  return (
+    <div className='flex justify-end border-t px-4 py-2'>
+      <Button
+        size='sm'
+        variant='outline'
+        nativeButton={false}
+        render={
+          <Link
+            role='link'
+            to='/keys'
+            search={{ route_model: props.model, route_id: props.routeId }}
+          />
+        }
+      >
+        <KeyRound className='size-3.5' aria-hidden />
+        {t('Create a key with this route')}
+      </Button>
+    </div>
+  )
+}
 function RouteCard(props: {
   route: PriceRoute
   type: string
   statisticsAvailable: boolean
   referenceOnly?: boolean
+  keyModel?: string
   onChange: (variant: number, values: Record<string, Scalar>) => void
 }) {
   const { t } = useTranslation()
@@ -168,19 +197,23 @@ function RouteCard(props: {
         )?.amount,
       }
     : null
+  const available = route.available ?? !!route.rows.length
   return (
     <section className='market-route-card min-w-0 overflow-hidden rounded-2xl border'>
       <RouteOptionCard
         chat={props.type === 'chat'}
         route={{
           ...route,
-          available: route.available ?? !!route.rows.length,
+          available,
           reason: route.reason || '',
           successRate: props.statisticsAvailable ? route.successRate : null,
           speed: route.speed || null,
           startingPrice,
         }}
       />
+      {props.keyModel && available && (
+        <RouteKeyLink model={props.keyModel} routeId={route.id} />
+      )}
       <Collapsible>
         <div className='flex items-center justify-between gap-3 px-4 py-2'>
           <CollapsibleTrigger className='flex flex-1 items-center gap-2 text-left text-sm'>
@@ -422,7 +455,7 @@ function RouteCard(props: {
     </section>
   )
 }
-export function ModelPrices(props: { model: string }) {
+export function ModelPrices(props: { model: string; routeKeys?: boolean }) {
   const { t, i18n } = useTranslation()
   const [selections, setSelections] = useState<PriceSelections>({})
   const [sort, setSort] = useState('price')
@@ -549,6 +582,7 @@ export function ModelPrices(props: { model: string }) {
             type={data.model.type}
             statisticsAvailable={data.statisticsAvailable}
             referenceOnly={data.liveQuote}
+            keyModel={props.routeKeys ? props.model : undefined}
             onChange={(variantIndex, values) =>
               setSelections((previous) => ({
                 ...previous,

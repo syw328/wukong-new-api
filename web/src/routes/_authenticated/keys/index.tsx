@@ -31,6 +31,9 @@ const apiKeySearchSchema = z.object({
     .catch([]),
   filter: z.string().optional().catch(''),
   token: z.string().optional().catch(''),
+  // Model price pages open the create drawer with this model's route preset.
+  route_model: z.string().max(200).optional().catch(undefined),
+  route_id: z.string().max(200).optional().catch(undefined),
 })
 
 export const Route = createFileRoute('/_authenticated/keys/')({

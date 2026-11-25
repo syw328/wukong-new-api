@@ -37,9 +37,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
-import { useId, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
 
 import { SectionPageLayout } from '@/components/layout'
 import {
@@ -49,23 +48,33 @@ import {
 import { Button } from '@/components/ui/button'
 import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
 import { fetchTokenKey, getApiKeys } from '@/features/keys/api'
+import { CCSwitchDialog } from '@/features/keys/components/dialogs/cc-switch-dialog'
 import type { ApiKey } from '@/features/keys/types'
-import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
-import { getUserModels } from '@/lib/api'
+import { usePlatformModels } from '@/features/platform-models/api'
+import { getUserLogs } from '@/features/usage-logs/api'
+import { LOG_TYPE_ENUM } from '@/features/usage-logs/constants'
+import { getSelf, getUserModels } from '@/lib/api'
 import { handleServerError } from '@/lib/handle-server-error'
 import { MOTION_TRANSITION } from '@/lib/motion'
-import { portalLocalStorage, portalApiOrigin } from '@/lib/portal-runtime'
+import {
+  portalLocalStorage,
+  portalApiOrigin,
+  portalRuntime,
+} from '@/lib/portal-runtime'
 import { ROLE } from '@/lib/roles'
 import { requireServerSuccess } from '@/lib/server-error-message'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
+import { useRealKeyCopy } from '../../hooks/use-real-key-copy'
 import {
   useApiInfo,
   useDashboardContentVisibility,
 } from '../../hooks/use-status-data'
+import { buildCurlCommand, formatDisplayKey } from '../../lib/connection'
 import { AnnouncementsPanel } from './announcements-panel'
 import { ApiInfoPanel } from './api-info-panel'
+import { ConnectionInfoCard } from './connection-info-card'
 import { FAQPanel } from './faq-panel'
 import { PerformanceHealthPanel } from './performance-health-panel'
 import { SummaryCards } from './summary-cards'
@@ -96,7 +105,9 @@ type DashboardActionPath =
 interface StartStep {
   title: string
   description: string
-  to: DashboardActionPath
+  // A step either links to one page or offers its own actions.
+  to?: DashboardActionPath
+  actions?: ReactNode
   icon: LucideIcon
   completed: boolean
 }
@@ -165,25 +176,6 @@ function getPreferredKey(keys: ApiKey[]): ApiKey | null {
   return keys.find((item) => item.status === 1) ?? keys[0] ?? null
 }
 
-function formatDisplayKey(key?: string): string {
-  if (!key) return 'sk-...'
-  if (key.length <= 14) return key
-  return `${key.slice(0, 7)}...${key.slice(-4)}`
-}
-
-function buildCurlCommand(args: {
-  endpoint: string
-  apiKey: string
-  model: string
-}): string {
-  return [
-    `curl ${args.endpoint} \\`,
-    '  -H "Content-Type: application/json" \\',
-    `  -H "Authorization: Bearer ${args.apiKey}" \\`,
-    `  -d '{"model":"${args.model}","messages":[{"role":"user","content":"Say hello in one sentence."}]}'`,
-  ].join('\n')
-}
-
 function SetupGuideBackdrop(props: { compact?: boolean }) {
   return (
     <>
@@ -227,7 +219,6 @@ function StartStepItem(props: {
   index: number
   isLast: boolean
 }) {
-  const Icon = props.step.icon
   const StatusIcon = props.step.completed ? Check : Circle
 
   return (
@@ -250,32 +241,52 @@ function StartStepItem(props: {
         />
       </span>
 
-      <Link
-        to={props.step.to}
-        className='bg-background/70 hover:bg-muted/50 focus-visible:ring-ring flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left shadow-xs transition-colors outline-none focus-visible:ring-2'
-      >
-        <span className='flex min-w-0 items-start gap-2.5'>
-          <span className='bg-muted mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg'>
-            <Icon className='size-3.5' aria-hidden='true' />
-          </span>
-          <span className='flex min-w-0 flex-col gap-0.5'>
-            <span className='flex items-center gap-2 text-sm font-medium'>
-              <span className='text-muted-foreground font-mono text-xs tabular-nums'>
-                {props.index + 1}.
-              </span>
-              <span className='truncate'>{props.step.title}</span>
-            </span>
-            <span className='text-muted-foreground line-clamp-1 text-xs'>
-              {props.step.description}
-            </span>
-          </span>
-        </span>
-        <ArrowRight
-          className='text-muted-foreground size-4 shrink-0'
-          aria-hidden='true'
-        />
-      </Link>
+      {props.step.to ? (
+        <Link
+          to={props.step.to}
+          className='bg-background/70 hover:bg-muted/50 focus-visible:ring-ring flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left shadow-xs transition-colors outline-none focus-visible:ring-2'
+        >
+          <StartStepText step={props.step} index={props.index} />
+          <ArrowRight
+            className='text-muted-foreground size-4 shrink-0'
+            aria-hidden='true'
+          />
+        </Link>
+      ) : (
+        <div className='bg-background/70 flex min-w-0 flex-1 flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-2.5 shadow-xs'>
+          <StartStepText step={props.step} index={props.index} />
+          <div className='flex flex-wrap items-center gap-2'>
+            {props.step.actions}
+          </div>
+        </div>
+      )}
     </li>
+  )
+}
+
+function StartStepText(props: { step: StartStep; index: number }) {
+  const { t } = useTranslation()
+  const Icon = props.step.icon
+  return (
+    <span className='flex min-w-0 items-start gap-2.5'>
+      <span className='bg-muted mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg'>
+        <Icon className='size-3.5' aria-hidden='true' />
+      </span>
+      <span className='flex min-w-0 flex-col gap-0.5'>
+        <span className='flex items-center gap-2 text-sm font-medium'>
+          <span className='text-muted-foreground font-mono text-xs tabular-nums'>
+            {props.index + 1}.
+          </span>
+          <span className='truncate'>{props.step.title}</span>
+          {props.step.completed && (
+            <span className='sr-only'>{t('Completed')}</span>
+          )}
+        </span>
+        <span className='text-muted-foreground line-clamp-2 text-xs'>
+          {props.step.description}
+        </span>
+      </span>
+    </span>
   )
 }
 
@@ -285,43 +296,21 @@ function RequestPreview(props: {
 }) {
   const { t } = useTranslation()
   const shouldReduceMotion = useReducedMotion()
-  const [isCopying, setIsCopying] = useState(false)
-  const { copyToClipboard } = useCopyToClipboard({ notify: false })
+  const { copy, copying: isCopying } = useRealKeyCopy(props.example.keyId)
   const previewCurl = buildCurlCommand({
     endpoint: props.example.endpoint,
     apiKey: props.example.displayKey,
     model: props.example.model,
   })
   const previewLines = previewCurl.split('\n')
-  const handleCopyRequest = async () => {
-    if (!props.example.keyId || isCopying) return
-
-    setIsCopying(true)
-    try {
-      const result = await fetchTokenKey(props.example.keyId)
-      const key = result.success && result.data?.key ? result.data.key : ''
-      if (!key) {
-        handleServerError(result, t('Failed to copy to clipboard'))
-        return
-      }
-
-      const realCurl = buildCurlCommand({
+  const handleCopyRequest = () =>
+    copy((apiKey) =>
+      buildCurlCommand({
         endpoint: props.example.endpoint,
-        apiKey: `sk-${key}`,
+        apiKey,
         model: props.example.model,
       })
-      const copied = await copyToClipboard(realCurl)
-      if (copied) {
-        toast.success(t('Copied to clipboard'))
-      } else {
-        toast.error(t('Failed to copy to clipboard'))
-      }
-    } catch (error) {
-      handleServerError(error, t('Failed to copy to clipboard'))
-    } finally {
-      setIsCopying(false)
-    }
-  }
+    )
 
   return (
     <motion.div
@@ -477,10 +466,47 @@ export function OverviewDashboard() {
     boolean | null
   >(() => getSavedSetupGuideExpanded())
 
-  const requestCount = Number(user?.request_count ?? 0)
-  const remainQuota = Number(user?.quota ?? 0)
-  const usedQuota = Number(user?.used_quota ?? 0)
+  const [ccSwitchKey, setCCSwitchKey] = useState('')
+  const [ccSwitchLoading, setCCSwitchLoading] = useState(false)
+  const connectionInfoId = useId()
   const isAdmin = Boolean(user?.role && user.role >= ROLE.ADMIN)
+
+  // /api/user/self re-reads the platform wallet, so the top-up step follows
+  // real recharges made on the main site instead of the login-time snapshot.
+  const selfQuery = useQuery({
+    queryKey: ['dashboard', 'overview', 'self-balance'],
+    queryFn: async () => {
+      const result = requireServerSuccess(await getSelf())
+      return Number(result.data?.quota ?? 0)
+    },
+    enabled: Boolean(user),
+    staleTime: 30 * 1000,
+    meta: { errorToast: false },
+  })
+  const balance = selfQuery.data ?? Number(user?.quota ?? 0)
+
+  // A consume log is a call that succeeded and was billed. Keep checking
+  // until the first one arrives so step 3 ticks itself after the first call.
+  const successfulCallQuery = useQuery({
+    queryKey: ['dashboard', 'overview', 'successful-call'],
+    queryFn: async () => {
+      const result = requireServerSuccess(
+        await getUserLogs({ p: 1, page_size: 1, type: LOG_TYPE_ENUM.CONSUME })
+      )
+      return (result.data?.total ?? 0) > 0 || !!result.data?.items?.length
+    },
+    enabled: Boolean(user),
+    staleTime: 30 * 1000,
+    refetchInterval: (query) => (query.state.data ? false : 15 * 1000),
+    meta: { errorToast: false },
+  })
+  const hasSuccessfulCall = successfulCallQuery.data === true
+
+  // The mounted portal publishes its catalog; example requests use a chat
+  // model from it instead of whichever model the group list returns first.
+  const catalogQuery = usePlatformModels({
+    enabled: Boolean(portalRuntime().basePath),
+  })
 
   const apiKeysQuery = useQuery({
     queryKey: ['dashboard', 'overview', 'api-keys'],
@@ -505,32 +531,80 @@ export function OverviewDashboard() {
     [apiKeysQuery.data]
   )
 
-  const startSteps = useMemo<StartStep[]>(
-    () => [
-      {
-        title: t('Create API Key'),
-        description: t('Create a key for your app or service'),
-        to: '/keys',
-        icon: KeyRound,
-        completed: Boolean(preferredKey),
-      },
-      {
-        title: t('Add credits'),
-        description: t('Keep enough balance before production traffic'),
-        to: '/wallet',
-        icon: CreditCard,
-        completed: remainQuota > 0 || usedQuota > 0,
-      },
-      {
-        title: t('Send a request'),
-        description: t('Verify routing with Playground or your client'),
-        to: '/playground',
-        icon: TerminalSquare,
-        completed: requestCount > 0,
-      },
-    ],
-    [preferredKey, remainQuota, requestCount, t, usedQuota]
-  )
+  const openCCSwitch = async () => {
+    if (!preferredKey || ccSwitchLoading) return
+    setCCSwitchLoading(true)
+    try {
+      const result = await fetchTokenKey(preferredKey.id)
+      if (result.success && result.data?.key) {
+        setCCSwitchKey(`sk-${result.data.key}`)
+      } else {
+        handleServerError(result, t('An unexpected error occurred'))
+      }
+    } catch (error) {
+      handleServerError(error, t('An unexpected error occurred'))
+    } finally {
+      setCCSwitchLoading(false)
+    }
+  }
+
+  const startSteps: StartStep[] = [
+    {
+      title: t('Recharge'),
+      description: t('Keep enough balance before production traffic'),
+      to: '/wallet',
+      icon: CreditCard,
+      completed: balance > 0,
+    },
+    {
+      title: t('Create API Key'),
+      description: t('Create a key for your app or service'),
+      to: '/keys',
+      icon: KeyRound,
+      completed: Boolean(preferredKey),
+    },
+    {
+      title: t('Connect a tool'),
+      description: t(
+        'Import the key into CC Switch, or set up Claude Code and OpenAI SDKs with the connection details. Ticks after the first successful call.'
+      ),
+      icon: TerminalSquare,
+      completed: hasSuccessfulCall,
+      actions: (
+        <>
+          <Button
+            size='sm'
+            variant='outline'
+            className='h-7 px-2 text-xs'
+            disabled={!preferredKey || ccSwitchLoading}
+            onClick={() => void openCCSwitch()}
+          >
+            {t('CC Switch')}
+          </Button>
+          <Button
+            size='sm'
+            variant='ghost'
+            className='h-7 px-2 text-xs'
+            onClick={() => {
+              const card = document.getElementById(connectionInfoId)
+              card?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              card?.focus({ preventScroll: true })
+            }}
+          >
+            {t('Connection details')}
+          </Button>
+          <Button
+            size='sm'
+            variant='ghost'
+            className='h-7 px-2 text-xs'
+            render={<Link to='/playground' />}
+          >
+            {t('Playground')}
+          </Button>
+        </>
+      ),
+    },
+  ]
 
   const quickActions = useMemo<QuickAction[]>(
     () => [
@@ -568,6 +642,15 @@ export function OverviewDashboard() {
     [isAdmin, quickActions]
   )
 
+  const chatModels = (catalogQuery.data ?? []).filter(
+    (model) => model.type === 'chat' && model.available
+  )
+  const selectedModel = chatModels[0]?.id ?? modelsQuery.data?.[0]
+  const exampleModel = selectedModel ?? 'gpt-4o-mini'
+  const claudeModel =
+    chatModels.find((model) => model.client_apps?.includes('claude'))?.id ??
+    exampleModel
+
   const heroSignals = useMemo<HeroSignal[]>(
     () => [
       {
@@ -584,17 +667,17 @@ export function OverviewDashboard() {
       },
       {
         label: t('Model selected'),
-        value: modelsQuery.data?.[0] ?? t('Loading'),
+        value: selectedModel ?? t('Loading'),
         icon: Timer,
         tone: 'chart-4',
       },
     ],
-    [apiInfoItems.length, modelsQuery.data, preferredKey, t]
+    [apiInfoItems.length, selectedModel, preferredKey, t]
   )
 
   const requestExample = useMemo<RequestExample>(() => {
     const endpoint = normalizeEndpoint(apiInfoItems[0]?.url)
-    const model = modelsQuery.data?.[0] ?? 'gpt-4o-mini'
+    const model = exampleModel
     const keyName = preferredKey?.name ?? t('No API key yet')
     const ready = Boolean(preferredKey?.id && model)
 
@@ -608,11 +691,15 @@ export function OverviewDashboard() {
         : 'sk-...',
       ready,
     }
-  }, [apiInfoItems, modelsQuery.data, preferredKey, t])
+  }, [apiInfoItems, exampleModel, preferredKey, t])
 
   const completedStepCount = startSteps.filter((step) => step.completed).length
   const setupComplete = completedStepCount === startSteps.length
-  const setupStatusReady = apiKeysQuery.isFetched && Boolean(user)
+  const setupStatusReady =
+    apiKeysQuery.isFetched &&
+    selfQuery.isFetched &&
+    successfulCallQuery.isFetched &&
+    Boolean(user)
   const setupGuideExpanded =
     manualSetupGuideExpanded ?? (setupStatusReady && !setupComplete)
   const showLeftContentPanels =
@@ -692,7 +779,10 @@ export function OverviewDashboard() {
                           </div>
                         </div>
 
-                        <ol className='bg-background/45 rounded-2xl border p-2 backdrop-blur'>
+                        <ol
+                          aria-label={t('Setup steps')}
+                          className='bg-background/45 rounded-2xl border p-2 backdrop-blur'
+                        >
                           {startSteps.map((step, index) => (
                             <StartStepItem
                               key={step.title}
@@ -790,6 +880,14 @@ export function OverviewDashboard() {
 
           <SummaryCards />
 
+          <ConnectionInfoCard
+            id={connectionInfoId}
+            keyId={preferredKey?.id}
+            displayKey={requestExample.displayKey}
+            model={exampleModel}
+            claudeModel={claudeModel}
+          />
+
           {showContentPanels && (
             <CardStaggerContainer
               className={cn(
@@ -838,6 +936,15 @@ export function OverviewDashboard() {
               )}
             </CardStaggerContainer>
           )}
+          {/* SectionPageLayout only renders its slots; the dialog portals. */}
+          <CCSwitchDialog
+            open={Boolean(ccSwitchKey)}
+            onOpenChange={(open) => {
+              if (!open) setCCSwitchKey('')
+            }}
+            tokenId={preferredKey?.id ?? 0}
+            tokenKey={ccSwitchKey}
+          />
         </div>
       </SectionPageLayout.Content>
     </SectionPageLayout>

@@ -23,7 +23,14 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -36,8 +43,12 @@ import { OverviewDashboard } from '../overview-dashboard'
 const storageKey = 'dashboard_overview_setup_guide_expanded'
 let client: QueryClient
 let keyLookupError: Error | null
+let hasConsumeLog: boolean
+let walletQuota: number | null
 
 beforeEach(() => {
+  hasConsumeLog = true
+  walletQuota = null
   window.localStorage.clear()
   useSystemConfigStore.setState(useSystemConfigStore.getInitialState(), true)
   useAuthStore.getState().auth.setUser({
@@ -79,6 +90,57 @@ beforeEach(() => {
         return { data: { success: true, data: ['gpt-4o-mini'] } }
       case '/api/data/self':
         return { data: { success: true, data: [] } }
+      case '/api/user/self': {
+        // The server re-reads the platform wallet here; tests can make it
+        // differ from the login-time snapshot in the auth store.
+        const user = useAuthStore.getState().auth.user
+        return {
+          data: {
+            success: true,
+            data: { ...user, quota: walletQuota ?? user?.quota ?? 0 },
+          },
+        }
+      }
+      case '/api/log/self?p=1&page_size=1&type=2':
+        return {
+          data: {
+            success: true,
+            data: {
+              items: hasConsumeLog ? [{ id: 9, type: 2 }] : [],
+              total: hasConsumeLog ? 1 : 0,
+              page: 1,
+              page_size: 1,
+            },
+          },
+        }
+      case '/api/platform-catalog':
+        return {
+          data: {
+            success: true,
+            data: {
+              models: [
+                {
+                  id: 'image-first',
+                  type: 'image',
+                  available: true,
+                  client_apps: [],
+                },
+                {
+                  id: 'plain-chat',
+                  type: 'chat',
+                  available: true,
+                  client_apps: [],
+                },
+                {
+                  id: 'claude-chat',
+                  type: 'chat',
+                  available: true,
+                  client_apps: ['claude'],
+                },
+              ],
+            },
+          },
+        }
       default:
         throw new Error(`Unexpected dashboard request: ${url}`)
     }
@@ -87,6 +149,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  document.querySelector('#platform-portal-runtime')?.remove()
   client.clear()
   useAuthStore.setState(useAuthStore.getInitialState(), true)
   useSystemConfigStore.setState(useSystemConfigStore.getInitialState(), true)
@@ -112,9 +175,10 @@ describe('overview setup guide', () => {
 
     const toggle = await screen.findByRole('button', { name: 'Setup guide' })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await screen.findByRole('heading', { name: 'Connection details' })
     expect(
       screen.getAllByRole('heading').map((heading) => heading.textContent)
-    ).toEqual(['Overview', 'Usage at a glance'])
+    ).toEqual(['Overview', 'Usage at a glance', 'Connection details'])
     expect(screen.queryByText('Setup guide complete')).not.toBeInTheDocument()
     expect(screen.queryByText('Setup progress: 3/3')).not.toBeInTheDocument()
     for (const name of ['API Keys', 'Channels', 'Usage Logs', 'Pricing']) {
@@ -182,6 +246,7 @@ describe('overview setup guide', () => {
     useAuthStore
       .getState()
       .auth.setUser({ id: 1, username: 'new-user', role: 1 })
+    hasConsumeLog = false
     await renderOverview()
 
     await user.click(
@@ -209,18 +274,16 @@ describe('overview setup guide', () => {
       quota: 1000000,
     })
     window.localStorage.setItem(storageKey, 'collapsed')
+    hasConsumeLog = false
     await renderOverview()
     expect(await screen.findByText('Setup progress: 2/3')).toBeVisible()
 
-    act(() => {
-      useAuthStore.getState().auth.setUser({
-        id: 1,
-        username: 'dashboard-user',
-        role: 1,
-        quota: 1000000,
-        request_count: 1,
+    hasConsumeLog = true
+    await act(() =>
+      client.refetchQueries({
+        queryKey: ['dashboard', 'overview', 'successful-call'],
       })
-    })
+    )
     expect(
       await screen.findByRole('button', { name: 'Setup guide' })
     ).toHaveAttribute('aria-expanded', 'false')
@@ -237,5 +300,90 @@ describe('overview setup guide', () => {
     expect(
       screen.queryByRole('button', { name: 'Setup guide' })
     ).not.toBeInTheDocument()
+  })
+
+  it('orders the steps top-up, key, tool and ticks them from the live wallet, keys and successful calls', async () => {
+    walletQuota = 0
+    hasConsumeLog = false
+    await renderOverview()
+
+    const steps = within(
+      await screen.findByRole('list', { name: 'Setup steps' })
+    ).getAllByRole('listitem')
+    expect(steps.map((step) => step.textContent)).toEqual([
+      expect.stringContaining('Recharge'),
+      expect.stringContaining('Create API Key'),
+      expect.stringContaining('Connect a tool'),
+    ])
+    // The login snapshot still has quota; the re-read wallet is empty.
+    expect(within(steps[0]).queryByText('Completed')).not.toBeInTheDocument()
+    expect(within(steps[1]).getByText('Completed')).toBeInTheDocument()
+    expect(within(steps[2]).queryByText('Completed')).not.toBeInTheDocument()
+  })
+
+  it('imports the preferred key into the existing CC Switch dialog from the tool step', async () => {
+    const user = userEvent.setup()
+    hasConsumeLog = false
+    const post = vi.spyOn(api, 'post').mockResolvedValue({
+      data: { success: true, data: { key: 'real-key-for-import' } },
+    })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(null, { status: 401 })
+    )
+    await renderOverview()
+
+    const ccSwitch = await screen.findByRole('button', { name: 'CC Switch' })
+    await waitFor(() => expect(ccSwitch).toBeEnabled())
+    await user.click(ccSwitch)
+    expect(post).toHaveBeenCalledWith('/api/token/1/key')
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Import to CC Switch',
+    })
+    expect(within(dialog).getByRole('radio', { name: 'Claude' })).toBeChecked()
+  })
+
+  it('shows the portal Base URL and endpoints, masks the key and copies the first request with the real key', async () => {
+    const user = userEvent.setup()
+    const runtime = document.createElement('script')
+    runtime.id = 'platform-portal-runtime'
+    runtime.type = 'application/json'
+    runtime.textContent = JSON.stringify({
+      origin: window.location.origin,
+      basePath: '/api',
+      transportPath: '/api/open-platform',
+    })
+    document.body.append(runtime)
+    vi.spyOn(api, 'post').mockResolvedValue({
+      data: { success: true, data: { key: 'real-secret-key' } },
+    })
+    await renderOverview()
+
+    const card = await screen.findByRole('region', {
+      name: 'Connection details',
+    })
+    const base = `${window.location.origin}/api/open-platform`
+    expect(within(card).getByText(`${base}/v1`)).toBeVisible()
+    expect(within(card).getByText(`${base}/v1/messages`)).toBeVisible()
+    expect(
+      within(card).getByText(`${base}/v1beta/models/{model}:generateContent`)
+    ).toBeVisible()
+    await waitFor(() => expect(card).toHaveTextContent('"model":"plain-chat"'))
+    expect(card).toHaveTextContent('ANTHROPIC_MODEL="claude-chat"')
+    expect(card).toHaveTextContent('sk-masked')
+    expect(card).not.toHaveTextContent('real-secret-key')
+
+    await user.click(
+      within(card).getByRole('button', {
+        name: 'Copy First request (cURL) with your API key',
+      })
+    )
+    await waitFor(async () =>
+      expect(await navigator.clipboard.readText()).toContain(
+        'Authorization: Bearer sk-real-secret-key'
+      )
+    )
+    expect(await navigator.clipboard.readText()).toContain(
+      `curl ${base}/v1/chat/completions`
+    )
   })
 })

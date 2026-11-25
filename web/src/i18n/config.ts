@@ -17,12 +17,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import i18n from 'i18next'
-import LanguageDetector from 'i18next-browser-languagedetector'
 import { initReactI18next } from 'react-i18next'
 
-import { portalStorageKey } from '@/lib/portal-runtime'
-
-import { convertDetectedLanguage } from './languages'
+import { createInterfaceLanguageDetector } from './languages'
 import en from './locales/en.json'
 import fr from './locales/fr.json'
 import ja from './locales/ja.json'
@@ -41,8 +38,10 @@ export const resources = {
   zhTW,
 } as const
 
+// Detection order, cache and the portal's Simplified Chinese default live in
+// the detector, so i18n.init does not pass `detection` overrides.
 i18n
-  .use(LanguageDetector)
+  .use(createInterfaceLanguageDetector())
   .use(initReactI18next)
   .init({
     resources,
@@ -53,14 +52,6 @@ i18n
     debug: import.meta.env.DEV,
     interpolation: {
       escapeValue: false, // not needed for react as it escapes by default
-    },
-    detection: {
-      order: ['localStorage', 'navigator'],
-      caches: ['localStorage'],
-      lookupLocalStorage: portalStorageKey('i18nextLng'),
-      // Browsers report `zh-CN`/`zh-TW`/`zh`; map them onto our `zhCN`/`zhTW`
-      // codes (non-Chinese codes pass through for normal supportedLngs matching).
-      convertDetectedLanguage,
     },
   })
 

@@ -202,7 +202,7 @@ export function DocsWorkspace(props: {
                   )}
                 </p>
               )}
-              {!model && <ProtocolReference />}
+              {!model && <ProtocolReference models={models} />}
               {model && (
                 <section
                   className='mt-8'

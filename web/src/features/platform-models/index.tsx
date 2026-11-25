@@ -364,6 +364,7 @@ export function PlatformModelsPage(props: {
           model={selected}
           summary={selected ? summaries[selected.id] : undefined}
           onClose={() => setSelectedId('')}
+          routeKeys
         />
         <Footer />
       </main>

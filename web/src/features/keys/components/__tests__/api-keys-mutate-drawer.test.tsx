@@ -27,6 +27,7 @@ const { QueryClient, QueryClientProvider } =
 const { api } = await import('@/lib/api')
 const { ApiKeysProvider } = await import('../api-keys-provider')
 const { ApiKeysMutateDrawer } = await import('../api-keys-mutate-drawer')
+const { ApiKeysDialogs } = await import('../api-keys-dialogs')
 
 const i18n = createInstance()
 await i18n.use(initReactI18next).init({
@@ -145,7 +146,9 @@ function installApiFixtures(createdPayloads: Array<Record<string, unknown>>) {
   }
 }
 
-async function renderCreateDrawer(): Promise<void> {
+async function renderCreateDrawer(
+  routePreset?: Parameters<typeof ApiKeysMutateDrawer>[0]['routePreset']
+): Promise<void> {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
@@ -186,7 +189,11 @@ async function renderCreateDrawer(): Promise<void> {
     <QueryClientProvider client={queryClient}>
       <I18nextProvider i18n={i18n}>
         <ApiKeysProvider>
-          <ApiKeysMutateDrawer open onOpenChange={() => undefined} />
+          <ApiKeysMutateDrawer
+            open
+            onOpenChange={() => undefined}
+            routePreset={routePreset}
+          />
         </ApiKeysProvider>
       </I18nextProvider>
     </QueryClientProvider>
@@ -438,6 +445,74 @@ test('custom route selection requires routes and saves exact manual order only w
           allowed_strategies: ['balanced'],
           route_order: 'manual',
           route_ids: ['b'.repeat(24), 'a'.repeat(24)],
+        },
+      ],
+    },
+  })
+})
+
+test('a price page route link opens the create drawer once and hands the preset over', async () => {
+  installApiFixtures([])
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  queryClient.setQueryData(
+    ['status'],
+    { default_use_auto_group: false, platform_key_routing: true },
+    { updatedAt: Date.now() + 60_000 }
+  )
+  renderedDrawer = { queryClient }
+  let opened = 0
+  const onOpened = () => {
+    opened += 1
+  }
+  render(
+    <QueryClientProvider client={queryClient}>
+      <I18nextProvider i18n={i18n}>
+        <ApiKeysProvider>
+          <ApiKeysDialogs
+            routePreset={{ model: 'gpt-image-2', routeId: 'a'.repeat(24) }}
+            onRoutePresetOpened={onOpened}
+          />
+        </ApiKeysProvider>
+      </I18nextProvider>
+    </QueryClientProvider>
+  )
+  expect(
+    await screen.findByRole('heading', { name: 'Create API Key' })
+  ).toBeVisible()
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: /Custom routes/ })
+    ).toHaveAttribute('aria-pressed', 'true')
+  )
+  expect(opened).toBe(1)
+})
+
+test('a route preset from the price page creates a key limited to that model and exact route', async () => {
+  const createdPayloads: Array<Record<string, unknown>> = []
+  installApiFixtures(createdPayloads)
+  await renderCreateDrawer({ model: 'gpt-image-2', routeId: 'b'.repeat(24) })
+  expect(screen.getByRole('button', { name: /Custom routes/ })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+  expect(screen.getByText('gpt-image-2')).toBeVisible()
+  changeInput(getControlByLabel('Name'), 'route-b-key')
+  fireEvent.click(findButton('Save changes', true))
+  await waitFor(() => expect(createdPayloads).toHaveLength(1))
+  expect(createdPayloads[0]).toMatchObject({
+    name: 'route-b-key',
+    model_limits_enabled: true,
+    model_limits: 'gpt-image-2',
+    routing_policy: {
+      version: 2,
+      mode: 'custom',
+      model_rules: [
+        {
+          model: 'gpt-image-2',
+          route_order: 'strategy',
+          route_ids: ['b'.repeat(24)],
         },
       ],
     },

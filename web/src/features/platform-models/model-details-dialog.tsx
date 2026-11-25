@@ -20,6 +20,9 @@ export function ModelDetailsDialog(props: {
   model?: PlatformModel
   summary?: ModelSummary
   onClose: () => void
+  // Offer "create a key with this route" on each route (model square only,
+  // not inside the key editor that already picks routes).
+  routeKeys?: boolean
 }) {
   const { t } = useTranslation()
   const userId = useAuthStore((state) => state.auth.user?.id ?? 'anonymous')
@@ -100,7 +103,7 @@ export function ModelDetailsDialog(props: {
               </TabsTrigger>
             </TabsList>
             <TabsContent value='prices' className='pt-3'>
-              <ModelPrices model={model.id} />
+              <ModelPrices model={model.id} routeKeys={props.routeKeys} />
             </TabsContent>
             <TabsContent value='api' className='pt-3'>
               <Button

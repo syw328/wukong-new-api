@@ -27,6 +27,7 @@ import {
   type ApiKey,
   type ApiKeyFormData,
 } from '../types'
+import { newRoutingPolicy, selectModelRoutes } from './routing-policy'
 
 // ============================================================================
 // Form Schema
@@ -145,6 +146,26 @@ export function getApiKeyFormDefaultValues(
     auto_groups_mode: 'inherit',
     auto_groups: [],
     cross_group_retry: defaultUseAutoGroup,
+  }
+}
+
+export type KeyRoutePreset = { model: string; routeId: string }
+
+/**
+ * A new key that only allows one model and sends it through one exact route
+ * (custom routing), as chosen from that route on the model price page.
+ */
+export function applyKeyRoutePreset(
+  values: ApiKeyFormValues,
+  preset: KeyRoutePreset
+): ApiKeyFormValues {
+  return {
+    ...values,
+    model_limits_enabled: true,
+    model_limits: [preset.model],
+    routing_policy: selectModelRoutes(newRoutingPolicy(), preset.model, [
+      preset.routeId,
+    ]),
   }
 }
 

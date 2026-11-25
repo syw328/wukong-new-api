@@ -23,29 +23,54 @@ export const balanceResponse = {
   },
 }
 export const rechargeGuidance =
-  'Create a payment QR with POST /recharge/orders using this API key and a unique Idempotency-Key. amount is a CNY string and must be one of the site’s top-up amounts (the same ones the top-up page shows); any other amount returns 400 payment_amount_unavailable with allowed_amounts listing the current choices. payment_method is wechat or alipay. The key owner receives 1 credit per yuan; bonuses are separate. No user ID, browser login or model is needed. Display qr_code_image (a PNG data URL), or encode qr_code as a QR locally. Only trust the server status, never a client payment-success message.'
+  'Create a payment QR with POST /recharge/orders using this API key and a unique Idempotency-Key. amount is a CNY string and must be one of the site’s top-up amounts (the same ones the top-up page shows); any other amount returns 400 payment_amount_unavailable with allowed_amounts listing the current choices. payment_method must be alipay. The key owner receives 1 credit per yuan; bonuses are separate. No user ID, browser login or model is needed. Display qr_code_image (a PNG data URL), or encode qr_code as a QR locally. Only trust the server status, never a client payment-success message.'
 export const rechargeRecovery =
   'Poll GET /recharge/orders/{id} every 5 seconds. paid with credited_at confirms settlement; then GET /balance reads the wallet. Stop normal polling on paid, failed, expired, refunded or partially_refunded. Refund amounts are CNY; credited_points, bonus_points and debt_repaid are credits. On timeout or 5xx, query the original order or retry the same body and Idempotency-Key; never create a second payment blindly. An expired QR cannot be reused; check the original order before starting a new payment. Foreign orders return 404. This API recharges the account wallet, not the API key spending quota.'
 export function rechargeRequest(base: string): string {
-  return `curl --fail-with-body "${base}/recharge/orders" \\\n  -H "Authorization: Bearer $PLATFORM_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -H "Idempotency-Key: recharge-order-001" \\\n  -d '{"amount":"10.00","payment_method":"wechat"}'`
+  return `curl --fail-with-body "${base}/recharge/orders" \\\n  -H "Authorization: Bearer $PLATFORM_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -H "Idempotency-Key: recharge-order-001" \\\n  -d '{"amount":"10.00","payment_method":"alipay"}'`
 }
 export function rechargeQuery(base: string): string {
   return `curl --fail-with-body "${base}/recharge/orders/$ORDER_ID" \\\n  -H "Authorization: Bearer $PLATFORM_API_KEY"`
 }
 export const rechargeResponse = {
   success: true,
-  data: { id: 'LK_EXAMPLE_ORDER', status: 'pending', amount: '10.00', currency: 'CNY', points: 10,
-    credited_points: 0, bonus_points: 0, debt_repaid: 0, refunded_amount: '0.00', payment_method: 'wechat',
-    qr_code: 'weixin://example', qr_code_image: 'data:image/png;base64,...', credited_at: null, poll_after_seconds: 5 },
+  data: {
+    id: 'LK_EXAMPLE_ORDER',
+    status: 'pending',
+    amount: '10.00',
+    currency: 'CNY',
+    points: 10,
+    credited_points: 0,
+    bonus_points: 0,
+    debt_repaid: 0,
+    refunded_amount: '0.00',
+    payment_method: 'alipay',
+    qr_code: 'https://example.invalid/alipay-order',
+    qr_code_image: 'data:image/png;base64,...',
+    credited_at: null,
+    poll_after_seconds: 5,
+  },
 }
 // Platform-native uploads and voice cloning (server/public-api/publicVoiceRoutes.js,
 // publicApiRoutes.js /uploads/*); limits follow the platform, not this portal.
 export const uploadGuidance =
   'Upload local files with the same API key before using them in a request. Uploads are free and need no Idempotency-Key. Send multipart/form-data with a Content-Length header. Uploaded files belong to the key owner; other accounts cannot use them.'
 export const uploadEndpoints: Row[] = [
-  ['POST', '/uploads/images', 'File field image: one PNG, JPG or WebP image up to 2 MB. Returns a url valid for 24 hours.'],
-  ['POST', '/uploads/videos', 'File field video: one MP4 or MOV video up to 50 MB. Returns a url valid for 24 hours.'],
-  ['POST', '/upload', 'File field files: up to 10 images, videos or audio files, 100 MB each and 110 MB per request. Returns files[].id and needs a positive balance.'],
+  [
+    'POST',
+    '/uploads/images',
+    'File field image: one PNG, JPG or WebP image up to 2 MB. Returns a url valid for 24 hours.',
+  ],
+  [
+    'POST',
+    '/uploads/videos',
+    'File field video: one MP4 or MOV video up to 50 MB. Returns a url valid for 24 hours.',
+  ],
+  [
+    'POST',
+    '/upload',
+    'File field files: up to 10 images, videos or audio files, 100 MB each and 110 MB per request. Returns files[].id and needs a positive balance.',
+  ],
 ]
 export const uploadUsage =
   'Put the returned url into the media request params, for example params.images or params.videos. Public HTTPS links can be used directly without uploading. An oversized request returns 413.'
@@ -69,8 +94,16 @@ export const voiceEndpoints: Row[] = [
   ['POST', '/voices/clone', 'Create the voice and submit it for review'],
   ['GET', '/voices?model=speech-2.8', 'List your voices and review status'],
   ['GET', '/voices/{asset_id}', 'Read one voice'],
-  ['GET', '/voices/{asset_id}/activation/quote', 'Quote the one-time activation'],
-  ['POST', '/voices/{asset_id}/activation', 'Confirm the activation with the quote'],
+  [
+    'GET',
+    '/voices/{asset_id}/activation/quote',
+    'Quote the one-time activation',
+  ],
+  [
+    'POST',
+    '/voices/{asset_id}/activation',
+    'Confirm the activation with the quote',
+  ],
   ['GET', '/voices/{asset_id}/activation', 'Query the original activation'],
 ]
 export const voiceReview =
@@ -210,9 +243,15 @@ export function modelDocument(
     JSON.stringify(balanceResponse, null, 2),
     '```',
     `## ${t('Recharge by API')}`,
-    t(rechargeGuidance), t(rechargeRecovery),
-    '```sh', rechargeRequest(`${root}/v1`), rechargeQuery(`${root}/v1`), '```',
-    '```json', JSON.stringify(rechargeResponse, null, 2), '```',
+    t(rechargeGuidance),
+    t(rechargeRecovery),
+    '```sh',
+    rechargeRequest(`${root}/v1`),
+    rechargeQuery(`${root}/v1`),
+    '```',
+    '```json',
+    JSON.stringify(rechargeResponse, null, 2),
+    '```',
     `## ${t('Endpoints and workflow')}`,
     ...protocolEndpoints(model).map(
       ([method, path, label]) => `${method} ${root}/v1${path} — ${t(label)}`

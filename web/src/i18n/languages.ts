@@ -16,6 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import LanguageDetector from 'i18next-browser-languagedetector'
+
+import { portalRuntime, portalStorageKey } from '@/lib/portal-runtime'
+
 export const INTERFACE_LANGUAGE_OPTIONS = [
   { code: 'zhCN', label: '简体中文' },
   { code: 'en', label: 'English' },
@@ -72,6 +76,28 @@ export function convertDetectedLanguage(value: string): string {
     return 'zhTW'
   }
   return 'zhCN'
+}
+
+/**
+ * Interface language detection. A saved choice always wins. The platform
+ * portal mounted at `/api` serves mainland developers first, so a visitor
+ * without one starts in Simplified Chinese whatever the browser reports; a
+ * standalone New API keeps browser detection.
+ */
+export function createInterfaceLanguageDetector(): LanguageDetector {
+  const detector = new LanguageDetector(undefined, {
+    order: ['localStorage', 'portalDefault', 'navigator'],
+    caches: ['localStorage'],
+    lookupLocalStorage: portalStorageKey('i18nextLng'),
+    // Browsers report `zh-CN`/`zh-TW`/`zh`; map them onto our `zhCN`/`zhTW`
+    // codes (non-Chinese codes pass through for normal supportedLngs matching).
+    convertDetectedLanguage,
+  })
+  detector.addDetector({
+    name: 'portalDefault',
+    lookup: () => (portalRuntime().basePath ? 'zhCN' : undefined),
+  })
+  return detector
 }
 
 /**

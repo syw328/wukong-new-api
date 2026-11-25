@@ -13,9 +13,10 @@ import type {
   MarketSummaries,
 } from './types'
 
-export function usePlatformModels() {
+export function usePlatformModels(options: { enabled?: boolean } = {}) {
   const userId = useAuthStore((state) => state.auth.user?.id ?? 'anonymous')
   return useQuery({
+    enabled: options.enabled ?? true,
     queryKey: ['platform-full-catalog', portalRuntime().origin, userId],
     queryFn: async () => {
       const result = await api.get<{

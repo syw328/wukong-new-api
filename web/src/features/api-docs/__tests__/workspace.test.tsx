@@ -193,14 +193,30 @@ it('recharge documentation copies create and query examples for the current gate
   const user = userEvent.setup()
   setup()
   expect(screen.getByRole('heading', { name: 'Recharge by API' })).toBeVisible()
-  await user.click(screen.getByRole('button', { name: 'Copy recharge request' }))
+  await user.click(
+    screen.getByRole('button', { name: 'Copy recharge request' })
+  )
   const create = await navigator.clipboard.readText()
   expect(create).toContain('/v1/recharge/orders')
   expect(create).toContain('Idempotency-Key: recharge-order-001')
   expect(create).toContain('"amount":"10.00"')
   await user.click(screen.getByRole('button', { name: 'Copy recharge query' }))
-  expect(await navigator.clipboard.readText()).toContain('/v1/recharge/orders/$ORDER_ID')
+  expect(await navigator.clipboard.readText()).toContain(
+    '/v1/recharge/orders/$ORDER_ID'
+  )
   expect(screen.getByText(/"qr_code_image":/)).toBeVisible()
+})
+
+it('recharge documentation only offers the alipay payment method the platform accepts', async () => {
+  const user = userEvent.setup()
+  setup()
+  const recharge = screen.getByRole('region', { name: 'Recharge by API' })
+  await user.click(
+    within(recharge).getByRole('button', { name: 'Copy recharge request' })
+  )
+  const create = await navigator.clipboard.readText()
+  expect(create).toContain('"payment_method":"alipay"')
+  expect(recharge).not.toHaveTextContent(/wechat|weixin/i)
 })
 
 it('upload and voice cloning guides copy portal requests with the fields the platform requires', async () => {
