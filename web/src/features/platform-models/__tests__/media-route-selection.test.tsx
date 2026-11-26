@@ -34,7 +34,7 @@ const model: PlatformModel = {
 const routes: PriceRoute[] = [
   {
     id: 'f643e0a8ad1bd2af10d2c94b',
-    provider: 'LD-3',
+    provider: 'R-35',
     sku: 'Special',
     variantIndex: 0,
     variants: [],
@@ -55,7 +55,7 @@ const routes: PriceRoute[] = [
   },
   {
     id: '94ab67158fe5abd515c6b792',
-    provider: 'XN-15',
+    provider: 'R-97',
     sku: 'A',
     variantIndex: 0,
     variants: [],
@@ -91,7 +91,7 @@ it('selecting a named route changes both complete request examples and the publi
     2
   )
   await user.click(screen.getByRole('combobox', { name: 'Generation route' }))
-  await user.click(await screen.findByRole('option', { name: 'XN-15 · A' }))
+  await user.click(await screen.findByRole('option', { name: 'R-97 · A' }))
   const python = screen.getByRole('tabpanel', { name: 'Python' })
   expect(python.textContent).toContain('"route_id": "94ab67158fe5abd515c6b792"')
   expect(python.textContent).toContain('"resolution": "480p"')
