@@ -4057,7 +4057,7 @@
     "One IP or CIDR range per line": "1行に1つのIPまたはCIDR範囲",
     "One IP per line (empty for no restriction)": "1行に1つのIP (制限なしの場合は空欄)",
     "one keyword per line": "1行に1つのキーワード",
-    "One management key lets your scripts or AI tools create, view, change and delete the API keys of this account.": "管理キーを 1 つ使うと、スクリプトや AI ツールからこのアカウントの API キーを作成・表示・変更・削除できます。",
+    "One management key lets your own server-side programs create, view, change and delete the API keys of this account. Never give it to AI tools or put it in browser code.": "管理キーを使うと、自社のサーバー側プログラムからこのアカウントの API キーを作成・表示・変更・削除できます。AI ツールに渡したり、ブラウザのコードに含めたりしないでください。",
     "online": "オンライン",
     "Online": "オンライン",
     "Online payment is not enabled. Please contact the administrator.": "オンライン決済が有効になっていません。管理者にお問い合わせください。",

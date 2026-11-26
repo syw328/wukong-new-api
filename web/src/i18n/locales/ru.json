@@ -4057,7 +4057,7 @@
     "One IP or CIDR range per line": "Один IP или диапазон CIDR на строку",
     "One IP per line (empty for no restriction)": "Один IP на строку (пусто для отсутствия ограничений)",
     "one keyword per line": "одно ключевое слово на строку",
-    "One management key lets your scripts or AI tools create, view, change and delete the API keys of this account.": "Один ключ управления позволяет вашим скриптам и ИИ-инструментам создавать, просматривать, изменять и удалять API-ключи этого аккаунта.",
+    "One management key lets your own server-side programs create, view, change and delete the API keys of this account. Never give it to AI tools or put it in browser code.": "Ключ управления позволяет вашим серверным программам создавать, просматривать, изменять и удалять API-ключи этого аккаунта. Никогда не передавайте его AI-инструментам и не размещайте в коде браузера.",
     "online": "онлайн",
     "Online": "Онлайн",
     "Online payment is not enabled. Please contact the administrator.": "Онлайн-оплата не включена. Пожалуйста, свяжитесь с администратором.",

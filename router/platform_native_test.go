@@ -470,6 +470,30 @@ func TestPlatformUsagePricingAndFeedbackRelayAsTheKeyOwner(t *testing.T) {
 	assert.Len(t, fixture.recorded(), 6)
 }
 
+func TestPlatformUsageTranslatesTheCallersPortalTaskID(t *testing.T) {
+	fixture := newPlatformNativeTest(t)
+	require.NoError(t, model.DB.AutoMigrate(&model.Task{}))
+	for _, task := range []model.Task{
+		{TaskID: "task_owned_media", Platform: constant.TaskPlatform("platform-media"), UserId: 9101, Status: model.TaskStatusSuccess,
+			PrivateData: model.TaskPrivateData{UpstreamTaskID: "act_platform_owned"}},
+		{TaskID: "task_foreign_media", Platform: constant.TaskPlatform("platform-media"), UserId: 9102, Status: model.TaskStatusSuccess,
+			PrivateData: model.TaskPrivateData{UpstreamTaskID: "act_platform_foreign"}},
+	} {
+		require.NoError(t, model.DB.Create(&task).Error)
+	}
+	fixture.reply = func(w http.ResponseWriter, r *http.Request) { _, _ = fmt.Fprintf(w, `{"echo":%q}`, r.URL.Path) }
+
+	owned := fixture.send(httptest.NewRequest(http.MethodGet, "/v1/usage/task_owned_media", nil), "nativeowner")
+	require.Equal(t, http.StatusOK, owned.Code, owned.Body.String())
+	assert.JSONEq(t, `{"echo":"/v1/usage/act_platform_owned"}`, owned.Body.String())
+
+	for _, target := range []string{"/v1/usage/task_foreign_media", "/v1/usage/task_missing"} {
+		response := fixture.send(httptest.NewRequest(http.MethodGet, target, nil), "nativeowner")
+		assert.Equal(t, http.StatusNotFound, response.Code, target)
+	}
+	assert.Len(t, fixture.recorded(), 1, "another user's or an unknown portal task never reaches the platform")
+}
+
 func TestPlatformSelfServiceRejectionsAndMissingPlatformRoutes(t *testing.T) {
 	fixture := newPlatformNativeTest(t)
 	for _, item := range []struct {

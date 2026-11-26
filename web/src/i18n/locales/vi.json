@@ -4057,7 +4057,7 @@
     "One IP or CIDR range per line": "Một IP hoặc dải CIDR mỗi dòng",
     "One IP per line (empty for no restriction)": "Mỗi IP một dòng (để trống nếu không giới hạn)",
     "one keyword per line": "Mỗi dòng một từ khóa",
-    "One management key lets your scripts or AI tools create, view, change and delete the API keys of this account.": "Một khóa quản lý cho phép script hoặc công cụ AI của bạn tạo, xem, sửa và xóa các khóa API của tài khoản này.",
+    "One management key lets your own server-side programs create, view, change and delete the API keys of this account. Never give it to AI tools or put it in browser code.": "Một khóa quản lý cho phép chương trình phía máy chủ của bạn tạo, xem, sửa và xóa các khóa API của tài khoản này. Không bao giờ đưa nó cho công cụ AI hoặc đặt trong mã trình duyệt.",
     "online": "trực tuyến",
     "Online": "Trực tuyến",
     "Online payment is not enabled. Please contact the administrator.": "Thanh toán trực tuyến chưa được kích hoạt. Vui lòng liên hệ quản trị viên.",

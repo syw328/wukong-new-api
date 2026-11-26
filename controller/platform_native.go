@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 )
@@ -193,6 +194,16 @@ func PlatformUsage(c *gin.Context) {
 		if id == "." || id == ".." {
 			abortPlatformRelay(c, http.StatusNotFound, "not_found", "Task not found")
 			return
+		}
+		// A portal media task id (task_…) is this gateway's own; the platform knows the
+		// task by its upstream id. Only the caller's own task is translated.
+		if strings.HasPrefix(id, "task_") {
+			task, exist, err := model.GetByTaskId(c.GetInt("id"), id)
+			if err != nil || !exist || task == nil || task.GetUpstreamTaskID() == "" {
+				abortPlatformRelay(c, http.StatusNotFound, "not_found", "Task not found")
+				return
+			}
+			id = task.GetUpstreamTaskID()
 		}
 		path += "/" + url.PathEscape(id)
 	} else {

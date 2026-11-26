@@ -97,7 +97,7 @@ export function ManagementKeyDialog(props: {
         onOpenChange={close}
         title={t('Manage keys via API')}
         description={t(
-          'One management key lets your scripts or AI tools create, view, change and delete the API keys of this account.'
+          'One management key lets your own server-side programs create, view, change and delete the API keys of this account. Never give it to AI tools or put it in browser code.'
         )}
         contentClassName='sm:max-w-xl'
         footer={<Button onClick={() => close(false)}>{t('Close')}</Button>}

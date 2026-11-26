@@ -4057,7 +4057,7 @@
     "One IP or CIDR range per line": "每行一個 IP 或 CIDR 範圍",
     "One IP per line (empty for no restriction)": "每行一個 IP (留空表示無限制)",
     "one keyword per line": "每行一個關鍵詞",
-    "One management key lets your scripts or AI tools create, view, change and delete the API keys of this account.": "一把管理金鑰可讓你的腳本或 AI 工具建立、檢視、修改及刪除本帳號的 API 金鑰。",
+    "One management key lets your own server-side programs create, view, change and delete the API keys of this account. Never give it to AI tools or put it in browser code.": "一把管理金鑰可讓你自己的伺服器端程式建立、檢視、修改和刪除本帳號的 API 金鑰。不要交給 AI 工具，也不要放進網頁前端程式碼。",
     "online": "在線",
     "Online": "在線",
     "Online payment is not enabled. Please contact the administrator.": "管理員未開啟線上支付功能，請聯絡管理員設定。",

@@ -4057,7 +4057,7 @@
     "One IP or CIDR range per line": "Une IP ou plage CIDR par ligne",
     "One IP per line (empty for no restriction)": "Une IP par ligne (laisser vide pour aucune restriction)",
     "one keyword per line": "un mot-clé par ligne",
-    "One management key lets your scripts or AI tools create, view, change and delete the API keys of this account.": "Une clé de gestion permet à vos scripts ou outils d’IA de créer, consulter, modifier et supprimer les clés API de ce compte.",
+    "One management key lets your own server-side programs create, view, change and delete the API keys of this account. Never give it to AI tools or put it in browser code.": "Une clé de gestion permet à vos propres programmes côté serveur de créer, consulter, modifier et supprimer les clés API de ce compte. Ne la confiez jamais à des outils d'IA et ne la placez pas dans le code du navigateur.",
     "online": "en ligne",
     "Online": "En ligne",
     "Online payment is not enabled. Please contact the administrator.": "Le paiement en ligne n'est pas activé. Veuillez contacter l'administrateur.",
