@@ -82,7 +82,7 @@ function pricingSection(base: string): ReferenceSection {
       routes: [
         {
           route_id: '0123456789abcdef01234567',
-          name: 'R-97 · Example',
+          name: 'XN-15 · Example',
           billing_unit: 'second',
           status: 'active',
           available_for_this_key: true,
@@ -103,7 +103,7 @@ function pricingSection(base: string): ReferenceSection {
         },
         {
           route_id: '89abcdef0123456789abcdef',
-          name: 'R-35 · Example',
+          name: 'LD-3 · Example',
           billing_unit: null,
           status: 'paused',
           paused_reason: 'no_valid_price',
