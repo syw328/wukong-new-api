@@ -110,6 +110,8 @@ it('full document copy contains the current model, request parameters and both c
   expect(text).toContain('```sh')
   expect(text).toContain('/v1/balance')
   expect(text).toContain('/v1/recharge/orders')
+  expect(text).toContain('/v1/recharge/options')
+  expect(text).toContain('notify_url (string)')
   expect(text).toContain('qr_code_image')
   expect(text).not.toContain('chat-one')
 })
@@ -136,7 +138,11 @@ it('the shared balance guide copies the current site request and explains credit
   expect(await navigator.clipboard.readText()).toContain(
     'Authorization: Bearer $PLATFORM_API_KEY'
   )
-  expect(screen.getByText(/"unit": "credits"/)).toBeVisible()
+  expect(
+    within(
+      screen.getByRole('region', { name: 'Query credit balance' })
+    ).getByText(/"unit": "credits"/)
+  ).toBeVisible()
 })
 
 it('a mounted portal recommends the unified site Base URL and notes the legacy portal address still works', async () => {
@@ -281,6 +287,56 @@ it('upload and voice cloning guides copy portal requests with the fields the pla
   expect(clone).toContain(`${base}/voices/clone`)
   expect(clone).toContain('Idempotency-Key: voice-clone-001')
   expect(clone).toContain('"upload_id":"REPLACE_WITH_FILES_0_ID"')
+})
+
+it('the quick start documents usage, route prices, callbacks, key self-service, the management key, SKILL.md and feedback against the unified Base URL', async () => {
+  const user = userEvent.setup()
+  setup()
+  const base = `${window.location.origin}/v1`
+  const copied = async (region: string, button: string) => {
+    await user.click(
+      within(screen.getByRole('region', { name: region })).getByRole('button', {
+        name: button,
+      })
+    )
+    return navigator.clipboard.readText()
+  }
+  const usage = await copied('Usage and spend', 'Copy usage request')
+  expect(usage).toContain("grep -i '^x-task-id:'")
+  expect(usage).toContain(`${base}/usage/$TASK_ID`)
+  expect(await copied('Route prices', 'Copy route price request')).toContain(
+    `${base}/models/MODEL_ID/pricing`
+  )
+  expect(
+    within(screen.getByRole('region', { name: 'Route prices' })).getByText(
+      /"paused_reason": "no_valid_price"/
+    )
+  ).toBeVisible()
+  const callback = await copied(
+    'Task completion callback (notify_url)',
+    'Copy callback request'
+  )
+  expect(callback).toContain('"notify_url":"https://example.com/hooks/media')
+  expect(callback).toContain('"authorization_max"')
+  expect(await copied('Check your key', 'Copy key request')).toContain(
+    `${base}/key`
+  )
+  const management = await copied(
+    'Manage keys via API',
+    'Copy management key requests'
+  )
+  expect(management).toContain('Authorization: Bearer $MANAGEMENT_KEY')
+  expect(management).toContain(`-X DELETE "${base}/keys/KEY_ID"`)
+  expect(management).not.toContain('$PLATFORM_API_KEY')
+  expect(
+    await copied('SKILL.md for AI coding tools', 'Copy SKILL.md request')
+  ).toContain(`${base}/skills/SKILL.md`)
+  expect(await copied('Report a problem', 'Copy feedback request')).toContain(
+    '"type":"doc"'
+  )
+  expect(await copied('Recharge by API', 'Copy recharge options request')).toBe(
+    `curl --fail-with-body "${base}/recharge/options" \\\n  -H "Authorization: Bearer $PLATFORM_API_KEY"`
+  )
 })
 
 it('a model document keeps the upload and voice cloning guides on the quick start', () => {

@@ -17,6 +17,9 @@ import { NativeReference } from './native-reference'
 import { ProtocolGuides } from './protocol-guides'
 import {
   rechargeGuidance,
+  rechargeOptionsGuidance,
+  rechargeOptionsRequest,
+  rechargeOptionsResponse,
   rechargeRecovery,
   rechargeRequest,
   rechargeQuery,
@@ -84,12 +87,20 @@ export function ProtocolReference(props: {
       <section className='space-y-4' aria-label={t('Recharge by API')}>
         <h2 className='text-xl font-semibold'>{t('Recharge by API')}</h2>
         <p className='text-muted-foreground text-sm leading-6'>
+          {t(rechargeOptionsGuidance)}
+        </p>
+        <p className='text-muted-foreground text-sm leading-6'>
           {t(rechargeGuidance)}
         </p>
         <p className='text-muted-foreground text-sm leading-6'>
           {t(rechargeRecovery)}
         </p>
         {[
+          {
+            title: 'GET /recharge/options',
+            code: rechargeOptionsRequest(base),
+            label: 'Copy recharge options request',
+          },
           {
             title: 'POST /recharge/orders',
             code: rechargeRequest(base),
@@ -118,6 +129,9 @@ export function ProtocolReference(props: {
             </pre>
           </div>
         ))}
+        <pre className='bg-muted/20 overflow-auto rounded-xl border p-4 text-xs leading-6'>
+          <code>{JSON.stringify(rechargeOptionsResponse, null, 2)}</code>
+        </pre>
         <pre className='bg-muted/20 overflow-auto rounded-xl border p-4 text-xs leading-6'>
           <code>{JSON.stringify(rechargeResponse, null, 2)}</code>
         </pre>

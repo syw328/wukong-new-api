@@ -17,13 +17,17 @@ import {
   voiceResponse,
   voiceReview,
 } from './reference'
+import {
+  type ReferenceSection,
+  selfServiceSections,
+} from './self-service-reference'
 
 // Kept apart from protocol-reference.tsx so that file stays within the
-// component size guideline; both sections only render on the quick start.
+// component size guideline; these sections only render on the quick start.
 export function NativeReference() {
   const { t } = useTranslation()
   const base = `${portalPublicApiOrigin()}/v1`
-  const sections = [
+  const sections: ReferenceSection[] = [
     {
       title: 'Upload reference media',
       notes: [uploadGuidance, uploadUsage],
@@ -40,6 +44,7 @@ export function NativeReference() {
       copyLabel: 'Copy voice cloning request',
       response: voiceResponse,
     },
+    ...selfServiceSections(base),
   ]
   return (
     <>
@@ -85,9 +90,11 @@ export function NativeReference() {
               <code>{section.code}</code>
             </pre>
           </div>
-          <pre className='bg-muted/20 overflow-auto rounded-xl border p-4 text-xs leading-6'>
-            <code>{JSON.stringify(section.response, null, 2)}</code>
-          </pre>
+          {section.response && (
+            <pre className='bg-muted/20 overflow-auto rounded-xl border p-4 text-xs leading-6'>
+              <code>{JSON.stringify(section.response, null, 2)}</code>
+            </pre>
+          )}
         </section>
       ))}
     </>

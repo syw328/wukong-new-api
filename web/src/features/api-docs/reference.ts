@@ -22,6 +22,20 @@ export const balanceResponse = {
     queried_at: '2026-11-01T12:00:00.000Z',
   },
 }
+export const rechargeOptionsGuidance =
+  'Read the current top-up amounts with GET /recharge/options before creating an order. amount is a CNY string, credits is the paid credit and bonus is the extra credit this account’s first top-up would add (0 once used). enabled false means this site has no online top-up.'
+export function rechargeOptionsRequest(base: string): string {
+  return `curl --fail-with-body "${base}/recharge/options" \\\n  -H "Authorization: Bearer $PLATFORM_API_KEY"`
+}
+export const rechargeOptionsResponse = {
+  enabled: true,
+  currency: 'CNY',
+  pay_methods: ['alipay'],
+  tiers: [
+    { amount: '10.00', bonus: 3, credits: 10 },
+    { amount: '50.00', bonus: 12, credits: 50 },
+  ],
+}
 export const rechargeGuidance =
   'Create a payment QR with POST /recharge/orders using this API key and a unique Idempotency-Key. amount is a CNY string and must be one of the site’s top-up amounts (the same ones the top-up page shows); any other amount returns 400 payment_amount_unavailable with allowed_amounts listing the current choices. payment_method must be alipay. The key owner receives 1 credit per yuan; bonuses are separate. No user ID, browser login or model is needed. Display qr_code_image (a PNG data URL), or encode qr_code as a QR locally. Only trust the server status, never a client payment-success message.'
 export const rechargeRecovery =
@@ -198,6 +212,11 @@ export function requestFields(model: PlatformModel): Row[] {
       'Creation only. Copy from the same quote without changing it.',
     ],
     [
+      'notify_url',
+      'string',
+      'Creation only. Optional public http(s) address called when the task completes or fails; the quick start explains the callback body.',
+    ],
+    [
       'Idempotency-Key',
       'header',
       'Creation only. Save one unique 8–160 character key per order; reuse it with the identical request when recovering.',
@@ -209,9 +228,12 @@ const mediaReceiptGuidance = [
   'For unknown status, keep the task ID and poll after poll_after_seconds. For quote_expired or quote_mismatch, request a fresh quote before submitting.',
   'Use your key to read the artifact list. Each content_url is a long-lived signed download link. Share it privately and keep it out of logs.',
 ]
+const chatReceiptGuidance = [
+  'The X-Task-Id response header names this call; after the reply ends, GET /usage/{task_id} returns its actual charge.',
+]
 export function recoveryGuidance(model: PlatformModel): string[] {
   return [
-    ...(model.type === 'chat' ? [] : mediaReceiptGuidance),
+    ...(model.type === 'chat' ? chatReceiptGuidance : mediaReceiptGuidance),
     '401 / 403: check the key, its permissions and the current site. 400: check the model and request fields. 429: reduce request frequency and follow the response guidance.',
     'For media, an expired quote or changed request requires a new quote before a new submission. A conflicting Idempotency-Key must not be used for a different order.',
     'A timeout or 5xx response does not prove that generation failed. Save the request, key and task ID; query the original task before retrying. Never blindly create another paid task.',
@@ -243,9 +265,11 @@ export function modelDocument(
     JSON.stringify(balanceResponse, null, 2),
     '```',
     `## ${t('Recharge by API')}`,
+    t(rechargeOptionsGuidance),
     t(rechargeGuidance),
     t(rechargeRecovery),
     '```sh',
+    rechargeOptionsRequest(`${root}/v1`),
     rechargeRequest(`${root}/v1`),
     rechargeQuery(`${root}/v1`),
     '```',
