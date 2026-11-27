@@ -195,6 +195,8 @@ export function ApiKeyRoutingEditor(props: {
       <Dialog
         open={open}
         onOpenChange={setOpen}
+        // A stray click beside the dialog must not throw away the models and routes picked so far.
+        disablePointerDismissal
         title={t(
           draft.mode === 'custom' ? 'Custom model routing' : 'Model permissions'
         )}

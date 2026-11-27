@@ -70,9 +70,30 @@
 }
 .key-route-picker {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 230px;
+  grid-template-columns: 300px minmax(0, 1fr) 230px;
   gap: 20px;
   min-height: 360px;
+}
+/* Side by side, each column scrolls on its own: a long route list must not carry the model list away. */
+@media (min-width: 1001px) {
+  .key-route-picker {
+    height: min(58vh, 640px);
+  }
+  .key-route-picker > * {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .key-route-picker > .key-model-list {
+    overflow: visible;
+  }
+  .key-route-picker .key-model-scroll {
+    flex: 1;
+    max-height: none;
+  }
+  .key-route-list {
+    padding-right: 4px;
+  }
 }
 .key-route-picker:not(:has(.key-route-list)) {
   grid-template-columns: minmax(0, 1fr) 260px;
@@ -84,14 +105,22 @@
   min-width: 0;
 }
 .key-model-scroll {
+  overflow-x: hidden;
   overflow-y: auto;
   max-height: 52vh;
   overscroll-behavior: contain;
+}
+.key-model-section {
+  padding: 10px 8px 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted-foreground);
 }
 .key-model-row {
   display: flex;
   gap: 10px;
   align-items: center;
+  min-width: 0;
   padding: 4px 8px;
   border-radius: 10px;
 }
@@ -115,6 +144,10 @@
   height: 32px;
   flex-shrink: 0;
 }
+.key-model-family-head small[data-chosen] {
+  color: var(--primary);
+  font-weight: 600;
+}
 .key-model-family-arrow {
   width: 16px;
   height: 16px;
@@ -136,10 +169,28 @@
   flex-direction: column;
   gap: 12px;
 }
+.key-route-list .route-option-card {
+  padding: 12px 14px;
+}
+.key-route-list .route-option-card[data-selectable] {
+  cursor: pointer;
+}
+.key-route-list .route-option-card[data-selectable]:hover {
+  border-color: color-mix(in srgb, var(--primary) 50%, var(--border));
+}
+.key-route-list .route-option-price {
+  margin: 8px 0;
+}
+.key-route-list .route-option-price strong {
+  font-size: 18px;
+}
 .key-selected-list {
   min-width: 0;
   border-left: 1px solid var(--border);
   padding-left: 18px;
+}
+.key-selected-row small[data-missing] {
+  color: var(--destructive);
 }
 .key-selected-row {
   display: flex;
@@ -150,7 +201,7 @@
 }
 @media (max-width: 1000px) {
   .key-route-picker {
-    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-columns: 240px minmax(0, 1fr);
   }
   .key-selected-list {
     grid-column: 1/-1;

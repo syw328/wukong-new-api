@@ -1,4 +1,5 @@
 // Copyright (C) 2026 QuantumNous and contributors. AGPL-3.0-or-later.
+import { ChevronDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -46,8 +47,9 @@ export function RoutingAdvanced(props: {
   const { t } = useTranslation()
   return (
     <Collapsible className='rounded-xl border p-4'>
-      <CollapsibleTrigger className='w-full text-left text-sm font-medium'>
+      <CollapsibleTrigger className='flex w-full items-center justify-between text-left text-sm font-medium'>
         {t('Advanced routing permissions')}
+        <ChevronDown className='text-muted-foreground size-4' />
       </CollapsibleTrigger>
       <CollapsibleContent className='space-y-4 pt-4'>
         <Label className='flex items-center justify-between gap-4'>
@@ -108,6 +110,14 @@ export function ModelRoutingRule(props: {
     ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
     update({ ...effective, route_ids: next })
   }
+  function routeName(id: string) {
+    const route = query.data?.routes.find((item) => item.id === id)
+    if (!route) return id
+    // A SKU that only repeats the model name adds nothing next to the route label.
+    return route.sku === query.data?.model.name
+      ? route.provider
+      : `${route.provider} · ${route.sku}`
+  }
   return (
     <section className='space-y-4 rounded-xl border p-4'>
       <h3 className='font-semibold break-all'>
@@ -128,21 +138,26 @@ export function ModelRoutingRule(props: {
         </Label>
       )}
       {!manual && (
-        <StrategySelect
-          label={t('Default strategy for {{model}}', { model: props.model })}
-          value={effective.default_strategy}
-          onChange={(strategy) => {
-            const next = changeRoutingStrategy(
-              { ...props.policy, ...effective },
-              strategy
-            )
-            update({
-              ...effective,
-              default_strategy: next.default_strategy,
-              allowed_strategies: next.allowed_strategies,
-            })
-          }}
-        />
+        <div className='space-y-1.5'>
+          <span className='text-muted-foreground block text-xs'>
+            {t('Routing strategy')}
+          </span>
+          <StrategySelect
+            label={t('Default strategy for {{model}}', { model: props.model })}
+            value={effective.default_strategy}
+            onChange={(strategy) => {
+              const next = changeRoutingStrategy(
+                { ...props.policy, ...effective },
+                strategy
+              )
+              update({
+                ...effective,
+                default_strategy: next.default_strategy,
+                allowed_strategies: next.allowed_strategies,
+              })
+            }}
+          />
+        </div>
       )}
       {manual && (
         <p className='text-muted-foreground text-xs'>
@@ -151,48 +166,53 @@ export function ModelRoutingRule(props: {
           )}
         </p>
       )}
-      {ids.map((id, index) => {
-        const route = query.data?.routes.find((item) => item.id === id)
-        return (
+      {!manual && (
+        // A strategy picks among these routes on every request, so they carry no order.
+        <div className='flex flex-wrap gap-2'>
+          {ids.map((id) => (
+            <span
+              key={id}
+              className='bg-muted/40 rounded-lg px-3 py-1.5 text-sm'
+            >
+              {routeName(id)}
+            </span>
+          ))}
+        </div>
+      )}
+      {manual &&
+        ids.map((id, index) => (
           <div
             key={id}
             className='bg-muted/40 flex items-center gap-3 rounded-lg p-3 text-sm'
           >
             <span className='text-muted-foreground'>{index + 1}</span>
-            <span className='min-w-0 flex-1 break-words'>
-              {route ? `${route.provider} · ${route.sku}` : id}
-            </span>
-            {manual && (
-              <>
-                <Button
-                  type='button'
-                  size='sm'
-                  variant='outline'
-                  disabled={index === 0}
-                  aria-label={t('Move route up {{index}}', {
-                    index: index + 1,
-                  })}
-                  onClick={() => move(index, -1)}
-                >
-                  ↑
-                </Button>
-                <Button
-                  type='button'
-                  size='sm'
-                  variant='outline'
-                  disabled={index === ids.length - 1}
-                  aria-label={t('Move route down {{index}}', {
-                    index: index + 1,
-                  })}
-                  onClick={() => move(index, 1)}
-                >
-                  ↓
-                </Button>
-              </>
-            )}
+            <span className='min-w-0 flex-1 break-words'>{routeName(id)}</span>
+            <Button
+              type='button'
+              size='sm'
+              variant='outline'
+              disabled={index === 0}
+              aria-label={t('Move route up {{index}}', {
+                index: index + 1,
+              })}
+              onClick={() => move(index, -1)}
+            >
+              ↑
+            </Button>
+            <Button
+              type='button'
+              size='sm'
+              variant='outline'
+              disabled={index === ids.length - 1}
+              aria-label={t('Move route down {{index}}', {
+                index: index + 1,
+              })}
+              onClick={() => move(index, 1)}
+            >
+              ↓
+            </Button>
           </div>
-        )
-      })}
+        ))}
       {props.policy.mode !== 'custom' && rule && (
         <Button
           type='button'

@@ -23,6 +23,8 @@ export function RouteOptionCard(props: {
   chat?: boolean
   selected?: boolean
   onSelect?: (checked: boolean) => void
+  // The model the routes are listed under: a route whose SKU only repeats it shows its label alone.
+  modelName?: string
 }) {
   const { t } = useTranslation()
   const route = props.route
@@ -38,11 +40,22 @@ export function RouteOptionCard(props: {
     paused: 'Temporarily paused',
     pricing: 'Price temporarily unavailable',
   }
+  const selectable =
+    props.onSelect && (route.available || props.selected)
+      ? props.onSelect
+      : undefined
   return (
     <section
       className='route-option-card'
       data-selected={props.selected || undefined}
+      data-selectable={selectable ? true : undefined}
       aria-label={`${route.provider} ${route.sku}`}
+      // The whole card toggles the route; the checkbox keeps its own click and keyboard handling.
+      onClick={(event) => {
+        if (!(event.target as Element).closest('[role="checkbox"]')) {
+          selectable?.(!props.selected)
+        }
+      }}
     >
       <div className='flex items-start gap-3'>
         {props.onSelect && (
@@ -57,9 +70,11 @@ export function RouteOptionCard(props: {
         )}
         <div className='min-w-0 flex-1'>
           <strong className='block text-sm'>{route.provider}</strong>
-          <span className='text-muted-foreground text-xs break-words'>
-            {route.sku}
-          </span>
+          {route.sku !== props.modelName && (
+            <span className='text-muted-foreground text-xs break-words'>
+              {route.sku}
+            </span>
+          )}
         </div>
         <Badge variant={route.available ? 'secondary' : 'outline'}>
           {t(
@@ -72,24 +87,23 @@ export function RouteOptionCard(props: {
       <div className='route-option-price'>
         {price ? (
           <>
+            {price.unit === 'tokens' && (
+              <span>{t(price.input != null ? 'Input' : 'Output')}</span>
+            )}
             <strong>{formatMarketAmount(price.amount)}</strong>
+            {price.unit === 'tokens' &&
+              price.input != null &&
+              price.output != null && (
+                <span>
+                  · {t('Output')} {formatMarketAmount(price.output)}
+                </span>
+              )}
             <span>
               {t('credits')} / {t(units[price.unit])}
             </span>
           </>
         ) : (
           <span>{t('Price temporarily unavailable')}</span>
-        )}
-        {price?.unit === 'tokens' && (
-          <span>
-            {t(price.input != null ? 'Input' : 'Output')}
-            {price.input != null && price.output != null && (
-              <>
-                {' '}
-                · {t('Output')} {formatMarketAmount(price.output)}
-              </>
-            )}
-          </span>
         )}
       </div>
       <div className='route-option-metrics'>

@@ -1,6 +1,6 @@
+import { ChevronRight } from 'lucide-react'
 // Copyright (C) 2026 QuantumNous and contributors. AGPL-3.0-or-later.
 import { useState } from 'react'
-import { ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { EmptyState } from '@/components/empty-state'
@@ -16,6 +16,7 @@ import {
 import {
   filterPlatformModels,
   foldPlatformModelFamilies,
+  modelCategory,
 } from '@/features/platform-models/helpers'
 import { MarketModelIcon } from '@/features/platform-models/market-card'
 import { ModelDetailsDialog } from '@/features/platform-models/model-details-dialog'
@@ -49,12 +50,33 @@ export function KeyRoutePicker(props: {
       props.eligible.includes(model.id) || props.models.includes(model.id)
   )
   const filtered = filterPlatformModels(models, category, search)
-  const entries = foldPlatformModelFamilies(filtered)
+  // "All models" reads as one short section per category, in the tabs' order; a category tab is one unnamed section.
+  const sections = (
+    category === 'all'
+      ? Object.keys(TYPE_LABELS).filter((value) => value !== 'all')
+      : [category]
+  )
+    .map((value) => ({
+      value: value as ModelCategory,
+      entries: foldPlatformModelFamilies(
+        filtered.filter((model) => modelCategory(model) === value)
+      ),
+    }))
+    .filter((section) => section.entries.length)
+  const activeName =
+    models.find((model) => model.id === props.activeModel)?.name ||
+    props.activeModel
   const custom = props.policy.mode === 'custom'
   const routes = useRoutingOptions(custom ? props.activeModel : '')
   const selected =
     props.policy.model_rules.find((rule) => rule.model === props.activeModel)
       ?.route_ids || []
+  function routeCount(id: string) {
+    return (
+      props.policy.model_rules.find((rule) => rule.model === id)?.route_ids
+        ?.length || 0
+    )
+  }
   function toggleModel(id: string, checked: boolean) {
     const next = checked
       ? [...new Set([...props.models, id])]
@@ -143,41 +165,66 @@ export function KeyRoutePicker(props: {
             />
           )}
           <div className='key-model-scroll'>
-            {entries.map((entry) => {
-              if (entry.kind === 'model') return modelRow(entry.model)
-              const chosen = entry.models.filter((model) =>
-                props.models.includes(model.id)
-              ).length
-              const open =
-                folds[entry.id] ??
-                (Boolean(search.trim()) ||
-                  entry.models.some((model) => model.id === props.activeModel))
-              return (
-                <div key={`family:${entry.id}`} className='key-model-family'>
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    className='key-model-family-head'
-                    aria-expanded={open}
-                    onClick={() =>
-                      setFolds((value) => ({ ...value, [entry.id]: !open }))
-                    }
-                  >
-                    <ChevronRight className='key-model-family-arrow' />
-                    <MarketModelIcon model={entry.models[0]} />
-                    <strong className='min-w-0 flex-1 truncate text-sm'>
-                      {entry.title}
-                    </strong>
-                    <small className='text-muted-foreground'>
-                      {chosen
-                        ? t('{{count}} models selected', { count: chosen })
-                        : entry.models.length}
-                    </small>
-                  </Button>
-                  {open && entry.models.map((model) => modelRow(model, true))}
-                </div>
-              )
-            })}
+            {sections.map((section) => (
+              <div key={section.value}>
+                {category === 'all' && (
+                  <h4 className='key-model-section'>
+                    {t(TYPE_LABELS[section.value])}
+                  </h4>
+                )}
+                {section.entries.map((entry) => {
+                  if (entry.kind === 'model') return modelRow(entry.model)
+                  const chosen = entry.models.filter((model) =>
+                    props.models.includes(model.id)
+                  ).length
+                  const open =
+                    folds[entry.id] ??
+                    (Boolean(search.trim()) ||
+                      entry.models.some(
+                        (model) => model.id === props.activeModel
+                      ))
+                  return (
+                    <div
+                      key={`family:${entry.id}`}
+                      className='key-model-family'
+                    >
+                      <Button
+                        type='button'
+                        variant='ghost'
+                        className='key-model-family-head'
+                        aria-expanded={open}
+                        onClick={() =>
+                          setFolds((value) => ({ ...value, [entry.id]: !open }))
+                        }
+                      >
+                        <ChevronRight className='key-model-family-arrow' />
+                        <MarketModelIcon model={entry.models[0]} />
+                        <strong className='min-w-0 flex-1 truncate text-sm'>
+                          {entry.title}
+                        </strong>
+                        <small
+                          className='text-muted-foreground'
+                          data-chosen={chosen || undefined}
+                          title={
+                            chosen
+                              ? t('{{count}} models selected', {
+                                  count: chosen,
+                                })
+                              : undefined
+                          }
+                        >
+                          {chosen
+                            ? `${chosen}/${entry.models.length}`
+                            : entry.models.length}
+                        </small>
+                      </Button>
+                      {open &&
+                        entry.models.map((model) => modelRow(model, true))}
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
             {!catalog.isLoading && !catalog.isError && !filtered.length && (
               <EmptyState title={t('No matching models')} />
             )}
@@ -191,10 +238,7 @@ export function KeyRoutePicker(props: {
               <>
                 <div className='flex flex-wrap items-center justify-between gap-2'>
                   <div>
-                    <h3 className='font-semibold'>
-                      {models.find((model) => model.id === props.activeModel)
-                        ?.name || props.activeModel}
-                    </h3>
+                    <h3 className='font-semibold'>{activeName}</h3>
                     <Button
                       size='sm'
                       variant='link'
@@ -243,6 +287,7 @@ export function KeyRoutePicker(props: {
                   <RouteOptionCard
                     key={route.id}
                     route={route}
+                    modelName={activeName}
                     chat={routes.data?.model.type === 'chat'}
                     selected={selected.includes(route.id)}
                     onSelect={(checked) =>
@@ -308,12 +353,9 @@ export function KeyRoutePicker(props: {
                     {models.find((model) => model.id === id)?.name || id}
                   </strong>
                   {custom && (
-                    <small>
+                    <small data-missing={!routeCount(id) || undefined}>
                       {t('{{count}} routes selected', {
-                        count:
-                          props.policy.model_rules.find(
-                            (rule) => rule.model === id
-                          )?.route_ids?.length || 0,
+                        count: routeCount(id),
                       })}
                     </small>
                   )}
