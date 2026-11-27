@@ -60,9 +60,18 @@ func platformImageParameters(input map[string]any, model platformImageModel) (ma
 			}
 		}
 	}
+	_, nativeImageField := definitions["image"]
+	_, pluralImageField := definitions["images"]
+	acceptImageAlias := pluralImageField && !nativeImageField
+	if acceptImageAlias && input["image"] != nil && input["images"] != nil {
+		return nil, "", fmt.Errorf("Provide reference images in only one field")
+	}
 	for name, value := range input {
 		if value == nil {
 			continue
+		}
+		if name == "image" && acceptImageAlias {
+			name = "images"
 		}
 		switch name {
 		case "model", "prompt", "n", "response_format", "size", "quality", "user", "routing_preference":
@@ -73,6 +82,20 @@ func platformImageParameters(input map[string]any, model platformImageModel) (ma
 		default:
 			if _, published := definitions[name]; !published {
 				return nil, "", fmt.Errorf("Unsupported image parameter: %s", name)
+			}
+			if name == "images" {
+				switch images := value.(type) {
+				case string:
+					value = []string{images}
+				case []any:
+					if maximum := model.referenceLimit(); maximum > 0 && len(images) > maximum {
+						return nil, "", fmt.Errorf("The selected model does not support this many reference images")
+					}
+				case []string:
+					// Image edits supply validated URLs and stage files separately.
+				default:
+					return nil, "", fmt.Errorf("Reference images must be a string or an array")
+				}
 			}
 			params[name] = value
 		}
@@ -151,10 +174,7 @@ func platformImageParameters(input map[string]any, model platformImageModel) (ma
 func (model platformImageModel) referenceLimit() int {
 	for _, field := range model.Parameters {
 		if field.Name == "images" {
-			if field.Max > 0 {
-				return min(field.Max, platformImageEditMaxReferences)
-			}
-			return platformImageEditMaxReferences
+			return field.Max
 		}
 	}
 	return 0

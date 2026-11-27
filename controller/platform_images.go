@@ -177,8 +177,7 @@ func PlatformImagesCompatibility(router http.Handler) gin.HandlerFunc {
 			}
 			format = selectedFormat
 			if edit != nil {
-				maximum := published.Data.Models[index].referenceLimit()
-				if maximum < len(edit.urls)+len(edit.files) {
+				if maximum := published.Data.Models[index].referenceLimit(); maximum > 0 && maximum < len(edit.urls)+len(edit.files) {
 					bridge.fail(c, 400, "invalid_request_error", "The selected model does not support this many reference images", "")
 					return
 				}

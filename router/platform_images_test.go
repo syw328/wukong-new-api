@@ -50,6 +50,7 @@ const imageCompatibilityCatalog = `[
  {"id":"gemini-3.1-flash-image-preview","type":"image","available":true,"parameters":[{"name":"images","max":8}]},
  {"id":"gemini-3.1-flash-image-preview-guan","type":"image","available":true,"parameters":[{"name":"images","max":8}]},
  {"id":"doubao-seedream-5-0-260128","type":"image","available":true,"parameters":[{"name":"size","options":[{"value":"2K","is_default":true},{"value":"3K"},{"value":"4K"}]},{"name":"aspect_ratio","options":[{"value":"auto","is_default":true},{"value":"1:1"},{"value":"3:2"}]},{"name":"web_search"}]},
+ {"id":"doubao-seedream-5-5-261028","type":"image","available":true,"parameters":[{"name":"size","options":[{"value":"2K","is_default":true},{"value":"1.5K"},{"value":"1K"}]},{"name":"aspect_ratio","options":[{"value":"auto","is_default":true},{"value":"1:1"}]},{"name":"images","max":10}]},
  {"id":"kling-v3-video","type":"video","available":true,"parameters":[{"name":"duration","options":[{"value":5,"is_default":true}]}]}
 ]`
 
@@ -436,6 +437,42 @@ func TestPlatformImagesCompatibilityGeneratesSixModelsAndSettlesOnce(t *testing.
 	require.NoError(t, model.DB.First(&user, 7).Error)
 	assert.Equal(t, 5_000_000, user.Quota, "the platform wallet mirror is refreshed from its authority, never locally reserved")
 	assert.Equal(t, 6*60_000, user.UsedQuota, "usage logs must still settle to measured platform cost once")
+}
+
+func TestPlatformImagesCompatibilityForwardsSeedreamReferences(t *testing.T) {
+	fixture := newPlatformImageTest(t)
+	const modelName = "doubao-seedream-5-5-261028"
+	references := make([]any, 10)
+	for index := range references {
+		references[index] = fmt.Sprintf("https://example.com/ref-%d.png", index)
+	}
+	for _, item := range []struct {
+		field string
+		count int
+	}{
+		{"image", 1},
+		{"image", 2},
+		{"images", 10},
+	} {
+		input := map[string]any{"model": modelName, "prompt": "Combine the references", "size": "1K"}
+		input[item.field] = references[:item.count]
+		if item.count == 1 {
+			input[item.field] = references[0]
+		}
+		body, err := common.Marshal(input)
+		require.NoError(t, err)
+		status, _, response := fixture.generate(t, string(body), fmt.Sprintf("fixture-seedream-%d", item.count), "imagesalice")
+		require.Equal(t, http.StatusOK, status, string(response))
+		assert.Equal(t, references[:item.count], fixture.requests[modelName]["params"].(map[string]any)["images"])
+	}
+	body, err := common.Marshal(map[string]any{
+		"model": modelName, "prompt": "Combine the references", "images": append(references, "https://example.com/extra.png"),
+	})
+	require.NoError(t, err)
+	status, _, response := fixture.generate(t, string(body), "fixture-seedream-too-many", "imagesalice")
+	assert.Equal(t, http.StatusBadRequest, status, string(response))
+	assert.Equal(t, 3, fixture.quotes)
+	assert.Equal(t, 3, fixture.submissions)
 }
 
 func TestPlatformImagesCompatibilityRejectsUnsafeRequestsAndPreservesOwnership(t *testing.T) {
