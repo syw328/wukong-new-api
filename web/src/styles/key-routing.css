@@ -124,8 +124,11 @@
   padding: 4px 8px;
   border-radius: 10px;
 }
+/* The model whose routes are open on the right: tinted with the brand colour so it reads in dark themes too. */
 .key-model-row[data-active] {
-  background: var(--muted);
+  background: color-mix(in srgb, var(--primary) 16%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--primary) 60%, transparent);
 }
 .key-model-row[data-child] {
   margin-left: 18px;
