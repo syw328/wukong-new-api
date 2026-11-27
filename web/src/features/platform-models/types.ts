@@ -27,6 +27,8 @@ export type PlatformModel = {
   quote_endpoint?: string
   vendor?: string
   category?: 'tool'
+  // The hall's fold: one brand (GPT, Claude …) or one model sold through several routes (Seedance 2.5).
+  family?: { id: string; title: string }
   client_apps?: string[]
   protocol?: string
   icon?: string

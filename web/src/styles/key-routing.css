@@ -98,6 +98,33 @@
 .key-model-row[data-active] {
   background: var(--muted);
 }
+.key-model-row[data-child] {
+  margin-left: 18px;
+}
+.key-model-family-head {
+  width: 100%;
+  height: auto;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 10px;
+  text-align: left;
+}
+.key-model-family-head .market-model-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+.key-model-family-arrow {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  transition: transform 0.15s ease;
+}
+.key-model-family-head[aria-expanded='true'] > .key-model-family-arrow {
+  transform: rotate(90deg);
+}
 .key-model-row .market-model-icon {
   width: 32px;
   height: 32px;

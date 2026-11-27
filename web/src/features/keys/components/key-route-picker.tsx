@@ -1,5 +1,6 @@
 // Copyright (C) 2026 QuantumNous and contributors. AGPL-3.0-or-later.
 import { useState } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { EmptyState } from '@/components/empty-state'
@@ -12,13 +13,17 @@ import {
   usePlatformModels,
   useRoutingOptions,
 } from '@/features/platform-models/api'
-import { filterPlatformModels } from '@/features/platform-models/helpers'
+import {
+  filterPlatformModels,
+  foldPlatformModelFamilies,
+} from '@/features/platform-models/helpers'
 import { MarketModelIcon } from '@/features/platform-models/market-card'
 import { ModelDetailsDialog } from '@/features/platform-models/model-details-dialog'
 import { RouteOptionCard } from '@/features/platform-models/route-option-card'
 import {
   TYPE_LABELS,
   type ModelCategory,
+  type PlatformModel,
 } from '@/features/platform-models/types'
 
 import { selectModelRoutes } from '../lib/routing-policy'
@@ -36,12 +41,15 @@ export function KeyRoutePicker(props: {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<ModelCategory | 'all'>('all')
   const [detail, setDetail] = useState('')
+  // Families the user opened or folded by hand; the rest follow the search and the model in view.
+  const [folds, setFolds] = useState<Record<string, boolean>>({})
   const catalog = usePlatformModels()
   const models = (catalog.data || []).filter(
     (model) =>
       props.eligible.includes(model.id) || props.models.includes(model.id)
   )
   const filtered = filterPlatformModels(models, category, search)
+  const entries = foldPlatformModelFamilies(filtered)
   const custom = props.policy.mode === 'custom'
   const routes = useRoutingOptions(custom ? props.activeModel : '')
   const selected =
@@ -66,6 +74,38 @@ export function KeyRoutePicker(props: {
     props.onChange(selectModelRoutes(props.policy, props.activeModel, ids), [
       ...new Set([...props.models, props.activeModel]),
     ])
+  }
+  function modelRow(model: PlatformModel, child = false) {
+    return (
+      <div
+        key={model.id}
+        className='key-model-row'
+        data-active={props.activeModel === model.id || undefined}
+        data-child={child || undefined}
+      >
+        <Checkbox
+          aria-label={t('Allow model {{name}}', { name: model.name })}
+          checked={props.models.includes(model.id)}
+          onCheckedChange={(checked) => toggleModel(model.id, checked)}
+        />
+        <Button
+          type='button'
+          variant='ghost'
+          className='h-auto min-w-0 flex-1 justify-start px-1 py-2 text-left'
+          onClick={() =>
+            custom ? props.onActiveModel(model.id) : setDetail(model.id)
+          }
+        >
+          <MarketModelIcon model={model} />
+          <span className='min-w-0'>
+            <strong className='block text-sm break-words'>{model.name}</strong>
+            <small className='text-muted-foreground block break-all'>
+              {model.id}
+            </small>
+          </span>
+        </Button>
+      </div>
+    )
   }
   return (
     <>
@@ -103,37 +143,41 @@ export function KeyRoutePicker(props: {
             />
           )}
           <div className='key-model-scroll'>
-            {filtered.map((model) => (
-              <div
-                key={model.id}
-                className='key-model-row'
-                data-active={props.activeModel === model.id || undefined}
-              >
-                <Checkbox
-                  aria-label={t('Allow model {{name}}', { name: model.name })}
-                  checked={props.models.includes(model.id)}
-                  onCheckedChange={(checked) => toggleModel(model.id, checked)}
-                />
-                <Button
-                  type='button'
-                  variant='ghost'
-                  className='h-auto min-w-0 flex-1 justify-start px-1 py-2 text-left'
-                  onClick={() =>
-                    custom ? props.onActiveModel(model.id) : setDetail(model.id)
-                  }
-                >
-                  <MarketModelIcon model={model} />
-                  <span className='min-w-0'>
-                    <strong className='block text-sm break-words'>
-                      {model.name}
+            {entries.map((entry) => {
+              if (entry.kind === 'model') return modelRow(entry.model)
+              const chosen = entry.models.filter((model) =>
+                props.models.includes(model.id)
+              ).length
+              const open =
+                folds[entry.id] ??
+                (Boolean(search.trim()) ||
+                  entry.models.some((model) => model.id === props.activeModel))
+              return (
+                <div key={`family:${entry.id}`} className='key-model-family'>
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    className='key-model-family-head'
+                    aria-expanded={open}
+                    onClick={() =>
+                      setFolds((value) => ({ ...value, [entry.id]: !open }))
+                    }
+                  >
+                    <ChevronRight className='key-model-family-arrow' />
+                    <MarketModelIcon model={entry.models[0]} />
+                    <strong className='min-w-0 flex-1 truncate text-sm'>
+                      {entry.title}
                     </strong>
-                    <small className='text-muted-foreground block break-all'>
-                      {model.id}
+                    <small className='text-muted-foreground'>
+                      {chosen
+                        ? t('{{count}} models selected', { count: chosen })
+                        : entry.models.length}
                     </small>
-                  </span>
-                </Button>
-              </div>
-            ))}
+                  </Button>
+                  {open && entry.models.map((model) => modelRow(model, true))}
+                </div>
+              )
+            })}
             {!catalog.isLoading && !catalog.isError && !filtered.length && (
               <EmptyState title={t('No matching models')} />
             )}

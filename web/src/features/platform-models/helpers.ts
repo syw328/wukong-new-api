@@ -42,6 +42,39 @@ export function filterPlatformModels(
   )
 }
 
+export type ModelListEntry =
+  | { kind: 'model'; model: PlatformModel }
+  | { kind: 'family'; id: string; title: string; models: PlatformModel[] }
+
+/**
+ * Folds a model list the way the hall does: a family with two or more listed
+ * members becomes one entry where its first member stood; other models stay rows.
+ */
+export function foldPlatformModelFamilies(
+  models: PlatformModel[]
+): ModelListEntry[] {
+  const members = new Map<string, PlatformModel[]>()
+  for (const model of models) {
+    if (!model.family) continue
+    members.set(model.family.id, [
+      ...(members.get(model.family.id) || []),
+      model,
+    ])
+  }
+  const placed = new Set<string>()
+  const entries: ModelListEntry[] = []
+  for (const model of models) {
+    const group = model.family && members.get(model.family.id)
+    if (!model.family || !group || group.length < 2) {
+      entries.push({ kind: 'model', model })
+    } else if (!placed.has(model.family.id)) {
+      placed.add(model.family.id)
+      entries.push({ kind: 'family', ...model.family, models: group })
+    }
+  }
+  return entries
+}
+
 export function platformRequestExample(
   model: PlatformModel,
   route?: PriceRoute
